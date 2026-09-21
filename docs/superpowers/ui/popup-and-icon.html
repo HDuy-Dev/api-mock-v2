@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>API Mock v2 — Popup and icon/badge</title>
+<link rel="stylesheet" href="ui-doc.css">
+</head>
+<body>
+<main class="doc">
+<h2>Popup và icon/badge</h2>
+<p class="subtitle">Popup chỉ là điều khiển nhanh (rộng 380px, không có editor). Vì engine mock im lặng, popup và badge là nơi duy nhất nói cho bạn biết mock có đang chạy trên tab hiện tại hay không.</p>
+
+<style>
+  .pgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:1.25rem;align-items:start;margin-bottom:2rem}
+  .cell .label{margin-bottom:.4rem}
+  .stage{background:var(--bg-tertiary);border-radius:12px;padding:18px;display:flex;justify-content:center}
+
+  .pop{--bg:#1a1d27;--surface:#21253a;--input:#181b28;--bd:#2e3350;--bd-soft:#252840;--tx:#e2e4f0;--mu:#8a8fb0;--ac:#f59e0b;--ac-tx:#1a1d27;--tg-off:#2e3350;--get:#10b981;--post:#f59e0b;--del:#ef4444;--ok:#10b981;--warn:#f59e0b;--err:#ef4444;
+       width:380px;background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:10px;overflow:hidden;font:13px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;text-align:left;cursor:default;box-shadow:0 10px 28px rgba(0,0,0,.35)}
+  .pop *{box-sizing:border-box;margin:0}
+  .pop .mono,.pop .mth,.pop .ur{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+  .pop .sp{flex:1}
+  .pop .mu{color:var(--mu)}
+  .pop b{font-weight:600}
+
+  .pop .head{display:flex;align-items:center;gap:8px;height:44px;padding:0 12px;background:var(--surface);border-bottom:1px solid var(--bd)}
+  .pop .logo{width:20px;height:20px;color:var(--ac);flex:none}
+  .pop .head .t{font-weight:600}
+  .pop .head .lbl{font-size:11px;color:var(--mu)}
+  .pop .tg{position:relative;flex:none;width:32px;height:18px;border-radius:10px;background:var(--tg-off)}
+  .pop .tg::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff}
+  .pop .tg.on{background:var(--ac)}
+  .pop .tg.on::after{left:16px}
+
+  .pop .status{display:flex;align-items:flex-start;gap:9px;padding:9px 12px;font-size:12px;border-bottom:1px solid var(--bd-soft)}
+  .pop .status .dot{flex:none;width:8px;height:8px;border-radius:50%;margin-top:5px}
+  .pop .status small{display:block;margin-top:2px;font-size:11px;line-height:1.45;color:var(--mu)}
+  .pop .status.ok{background:color-mix(in srgb,var(--ok) 9%,transparent)}   .pop .status.ok .dot{background:var(--ok)}
+  .pop .status.off{background:var(--bd-soft)}                                  .pop .status.off .dot{background:#6b7280}
+  .pop .status.warn{background:color-mix(in srgb,var(--warn) 11%,transparent)} .pop .status.warn .dot{background:var(--warn)}
+
+  .pop .list.dim{opacity:.5}
+  .pop .row{display:flex;align-items:center;gap:8px;height:46px;padding:0 12px;border-bottom:1px solid var(--bd-soft)}
+  .pop .row.off .txt,.pop .row.off .mth{opacity:.4}
+  .pop .txt{display:flex;flex-direction:column;flex:1;min-width:0}
+  .pop .nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pop .ur{font-size:10.5px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pop .hit{min-width:20px;text-align:center;font-size:10px;padding:1px 5px;border-radius:9px;background:var(--bd-soft);color:var(--mu)}
+  .pop .mth{flex:none;min-width:40px;text-align:center;font-size:9.5px;font-weight:700;letter-spacing:.03em;padding:3px 0;border-radius:3px}
+  .pop .mth.GET{color:var(--get);background:color-mix(in srgb,var(--get) 15%,transparent)}
+  .pop .mth.POST{color:var(--post);background:color-mix(in srgb,var(--post) 15%,transparent)}
+  .pop .mth.DELETE{color:var(--del);background:color-mix(in srgb,var(--del) 15%,transparent)}
+  .pop .none{padding:26px 20px;text-align:center;color:var(--mu);font-size:12px}
+  .pop .foot{padding:9px 12px;font-size:11.5px;color:var(--mu);background:var(--surface);border-top:1px solid var(--bd)}
+  .pop .foot b{color:var(--tx)}
+
+  /* icon tiles */
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem}
+  .tile{background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:20px 16px 16px;display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center}
+  .tile h3{font-size:.85rem;margin:0}
+  .tile p{font-size:.78rem;color:var(--text-secondary);margin:0}
+  .ico{position:relative;width:48px;height:48px}
+  .ico svg{width:48px;height:48px;display:block}
+  .bdg{position:absolute;right:-9px;bottom:-6px;min-width:18px;padding:1px 4px;border-radius:4px;font:700 11px/14px system-ui,sans-serif;text-align:center}
+</style>
+
+<div class="label">Popup — 5 trạng thái</div>
+<div class="pgrid">
+
+  <div class="cell">
+    <div class="label">1 · Đang hoạt động</div>
+    <div class="stage">
+      <div class="pop">
+        <div class="head">
+          <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 9l3 3-3 3M13 15h3M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z"/></svg>
+          <span class="t">API Mock</span><span class="sp"></span><span class="lbl">Mocking</span><span class="tg on"></span>
+        </div>
+        <div class="status ok"><span class="dot"></span><div><b>Active</b> · 3 mocked on this tab</div></div>
+        <div class="list">
+          <div class="row"><span class="mth GET">GET</span><span class="txt"><span class="nm">Users list</span><span class="ur">/api/users*</span></span><span class="hit">3</span><span class="tg on"></span></div>
+          <div class="row"><span class="mth POST">POST</span><span class="txt"><span class="nm">Login</span><span class="ur">/api/login</span></span><span class="hit">0</span><span class="tg on"></span></div>
+          <div class="row off"><span class="mth GET">GET</span><span class="txt"><span class="nm">Orders</span><span class="ur">https://shop.dev/api/orders/*</span></span><span class="hit">12</span><span class="tg"></span></div>
+          <div class="row"><span class="mth DELETE">DEL</span><span class="txt"><span class="nm">Delete user</span><span class="ur">/api/users/*</span></span><span class="hit">1</span><span class="tg on"></span></div>
+        </div>
+        <div class="foot">Edit rules: DevTools → <b>API Mock</b> tab</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cell">
+    <div class="label">2 · Đã tắt toàn cục</div>
+    <div class="stage">
+      <div class="pop">
+        <div class="head">
+          <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:#6b7280"><path d="M8 9l3 3-3 3M13 15h3M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z"/></svg>
+          <span class="t">API Mock</span><span class="sp"></span><span class="lbl">Mocking</span><span class="tg"></span>
+        </div>
+        <div class="status off"><span class="dot"></span><div><b>Off</b> · requests go straight to the network</div></div>
+        <div class="list dim">
+          <div class="row"><span class="mth GET">GET</span><span class="txt"><span class="nm">Users list</span><span class="ur">/api/users*</span></span><span class="hit">3</span><span class="tg on"></span></div>
+          <div class="row"><span class="mth POST">POST</span><span class="txt"><span class="nm">Login</span><span class="ur">/api/login</span></span><span class="hit">0</span><span class="tg on"></span></div>
+          <div class="row off"><span class="mth GET">GET</span><span class="txt"><span class="nm">Orders</span><span class="ur">https://shop.dev/api/orders/*</span></span><span class="hit">12</span><span class="tg"></span></div>
+          <div class="row"><span class="mth DELETE">DEL</span><span class="txt"><span class="nm">Delete user</span><span class="ur">/api/users/*</span></span><span class="hit">1</span><span class="tg on"></span></div>
+        </div>
+        <div class="foot">Edit rules: DevTools → <b>API Mock</b> tab</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cell">
+    <div class="label">3 · Tab hiện tại có sự cố</div>
+    <div class="stage">
+      <div class="pop">
+        <div class="head">
+          <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 9l3 3-3 3M13 15h3M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z"/></svg>
+          <span class="t">API Mock</span><span class="sp"></span><span class="lbl">Mocking</span><span class="tg on"></span>
+        </div>
+        <div class="status warn"><span class="dot"></span><div><b>1 issue on this tab</b><small>Rules didn't load in time, so a request went to the network. Reload the page. Details: DevTools → API Mock → Log.</small></div></div>
+        <div class="list">
+          <div class="row"><span class="mth GET">GET</span><span class="txt"><span class="nm">Users list</span><span class="ur">/api/users*</span></span><span class="hit">3</span><span class="tg on"></span></div>
+          <div class="row"><span class="mth POST">POST</span><span class="txt"><span class="nm">Login</span><span class="ur">/api/login</span></span><span class="hit">0</span><span class="tg on"></span></div>
+        </div>
+        <div class="foot">Edit rules: DevTools → <b>API Mock</b> tab</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cell">
+    <div class="label">4 · Tab chưa có engine (mới cài/cập nhật, hoặc trang không hỗ trợ)</div>
+    <div class="stage">
+      <div class="pop">
+        <div class="head">
+          <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 9l3 3-3 3M13 15h3M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z"/></svg>
+          <span class="t">API Mock</span><span class="sp"></span><span class="lbl">Mocking</span><span class="tg on"></span>
+        </div>
+        <div class="status warn"><span class="dot"></span><div><b>Not active on this tab yet</b><small>This tab was opened before the extension started — reload it to begin mocking. Not available on chrome:// pages or the Chrome Web Store.</small></div></div>
+        <div class="list">
+          <div class="row"><span class="mth GET">GET</span><span class="txt"><span class="nm">Users list</span><span class="ur">/api/users*</span></span><span class="hit">3</span><span class="tg on"></span></div>
+          <div class="row"><span class="mth POST">POST</span><span class="txt"><span class="nm">Login</span><span class="ur">/api/login</span></span><span class="hit">0</span><span class="tg on"></span></div>
+        </div>
+        <div class="foot">Edit rules: DevTools → <b>API Mock</b> tab</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cell">
+    <div class="label">5 · Chưa có rule nào</div>
+    <div class="stage">
+      <div class="pop">
+        <div class="head">
+          <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 9l3 3-3 3M13 15h3M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z"/></svg>
+          <span class="t">API Mock</span><span class="sp"></span><span class="lbl">Mocking</span><span class="tg on"></span>
+        </div>
+        <div class="status ok"><span class="dot"></span><div><b>Active</b> · no rules yet</div></div>
+        <div class="none">No rules yet.<br>Open DevTools (F12) → <b style="color:var(--tx)">API Mock</b> → <b style="color:var(--tx)">+ Add rule</b>.</div>
+        <div class="foot">Mocked requests won't appear in the Network tab.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="label">Icon trên thanh công cụ và badge (vẽ lúc chạy bằng OffscreenCanvas như bản cũ)</div>
+<div class="tiles">
+
+  <div class="tile">
+    <div class="ico"><svg viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#f59e0b"/><path d="M9.6 8.6 21.8 16 9.6 23.4" fill="none" stroke="#1c1917" stroke-width="3.7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <div><h3>Bật, chưa mock gì</h3><p>Không có badge</p></div>
+  </div>
+
+  <div class="tile">
+    <div class="ico"><svg viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#f59e0b"/><path d="M9.6 8.6 21.8 16 9.6 23.4" fill="none" stroke="#1c1917" stroke-width="3.7" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="bdg" style="background:#10b981;color:#06281c">3</span></div>
+    <div><h3>Bật, 3 request đã bị mock</h3><p>Badge xanh = số request bị mock trên tab này từ lần tải trang gần nhất</p></div>
+  </div>
+
+  <div class="tile">
+    <div class="ico"><svg viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#f59e0b"/><path d="M9.6 8.6 21.8 16 9.6 23.4" fill="none" stroke="#1c1917" stroke-width="3.7" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="bdg" style="background:#ef4444;color:#fff">!</span></div>
+    <div><h3>Tab có sự cố</h3><p>badge đỏ "!" khi tab có cảnh báo hoặc lỗi engine</p></div>
+  </div>
+
+  <div class="tile">
+    <div class="ico"><svg viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#4b5563"/><path d="M9.6 8.6 21.8 16 9.6 23.4" fill="none" stroke="#9ca3af" stroke-width="3.7" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="bdg" style="background:#4b5563;color:#fff">OFF</span></div>
+    <div><h3>Tắt toàn cục</h3><p>Icon xám + badge OFF, như bản cũ</p></div>
+  </div>
+
+</div>
+
+</main>
+</body>
+</html>

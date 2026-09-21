@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>API Mock v2 — Panel style options</title>
+<link rel="stylesheet" href="ui-doc.css">
+</head>
+<body>
+<main class="doc">
+<h2>Phong cách thị giác của panel</h2>
+<p class="subtitle"><b>Đã chọn: B.</b> Cùng một panel (danh sách rule · editor · log), hai hướng khác nhau. Bấm để chọn, rồi nói tôi biết muốn chỉnh gì (màu, mật độ, bo góc…). Popup sẽ theo hướng bạn chọn.</p>
+
+<style>
+  .option .content{min-width:0}
+  .option .content > p{margin-bottom:.75rem}
+
+  .pnl{--r:4px;display:flex;flex-direction:column;height:470px;background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:8px;overflow:hidden;font:12px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;text-align:left;cursor:default}
+  .pnl *{box-sizing:border-box;margin:0}
+  .pnl .mono,.pnl pre,.pnl .mth,.pnl .ur,.pnl .u,.pnl .t{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+  .pnl .sp{flex:1}
+  .pnl .mu{color:var(--mu)}
+
+  .pnl .bar{display:flex;align-items:center;gap:10px;height:36px;padding:0 10px;background:var(--surface);border-bottom:1px solid var(--bd);flex:none}
+  .pnl .ttl{font-weight:600}
+  .pnl .search{display:flex;align-items:center;width:200px;height:24px;padding:0 8px;background:var(--input);border:1px solid var(--bd);border-radius:var(--r);color:var(--mu)}
+  .pnl .btn{display:inline-flex;align-items:center;height:24px;padding:0 10px;background:transparent;color:var(--tx);border:1px solid var(--bd);border-radius:var(--r);font:inherit;font-size:11px}
+  .pnl .btn.pri{background:var(--ac);border-color:transparent;color:var(--ac-tx);font-weight:600}
+  .pnl .tg{position:relative;flex:none;width:28px;height:16px;border-radius:9px;background:var(--tg-off)}
+  .pnl .tg::after{content:"";position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#fff}
+  .pnl .tg.on{background:var(--ac)}
+  .pnl .tg.on::after{left:14px}
+
+  .pnl .main{display:flex;flex:1;min-height:0}
+  .pnl .list{flex:none;width:270px;border-right:1px solid var(--bd);overflow:hidden}
+  .pnl .row{display:flex;align-items:center;gap:8px;height:var(--row);padding:0 10px;border-bottom:1px solid var(--bd-soft)}
+  .pnl .row.sel{background:var(--sel);box-shadow:inset 2px 0 0 var(--ac)}
+  .pnl .row.off .txt,.pnl .row.off .mth{opacity:.4}
+  .pnl .txt{display:flex;flex-direction:column;flex:1;min-width:0}
+  .pnl .nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pnl .ur{font-size:10.5px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pnl .hit{min-width:20px;text-align:center;font-size:10px;padding:1px 5px;border-radius:9px;background:var(--bd-soft);color:var(--mu)}
+  .pnl .mth{flex:none;min-width:40px;text-align:center;font-size:9.5px;font-weight:700;letter-spacing:.03em;padding:3px 0;border-radius:3px}
+  .pnl .mth.GET{color:var(--get);background:color-mix(in srgb,var(--get) 15%,transparent)}
+  .pnl .mth.POST{color:var(--post);background:color-mix(in srgb,var(--post) 15%,transparent)}
+  .pnl .mth.DELETE{color:var(--del);background:color-mix(in srgb,var(--del) 15%,transparent)}
+
+  .pnl .ed{flex:1;min-width:0;display:flex;flex-direction:column;gap:9px;padding:10px 12px}
+  .pnl .ed-top{display:flex;align-items:center;gap:10px}
+  .pnl .ed-name{font-size:13px;font-weight:600}
+  .pnl .saved{font-size:10.5px;color:var(--ok)}
+  .pnl .kebab{color:var(--mu);padding:0 4px}
+  .pnl .line{display:flex;gap:8px;align-items:flex-end}
+  .pnl .inp{display:flex;align-items:center;height:26px;padding:0 8px;background:var(--input);border:1px solid var(--bd);border-radius:var(--r)}
+  .pnl .inp.grow{flex:1}
+  .pnl .inp.w64{width:64px}
+  .pnl .selm{display:flex;align-items:center;gap:6px;height:26px;padding:0 8px;background:var(--input);border:1px solid var(--bd);border-radius:var(--r);font-weight:600;color:var(--get)}
+  .pnl .fld{display:flex;flex-direction:column;gap:3px;font-size:10.5px;color:var(--mu);text-transform:uppercase;letter-spacing:.04em}
+  .pnl .fld .inp,.pnl .fld .code{text-transform:none;letter-spacing:0;color:var(--tx);font-size:12px}
+  .pnl .fld.grow{flex:1;min-height:0}
+  .pnl .lbl-row{display:flex;align-items:center;gap:8px}
+  .pnl .ok{color:var(--ok);text-transform:none;letter-spacing:0;font-size:10.5px}
+  .pnl .code{padding:6px 8px;background:var(--code);border:1px solid var(--bd);border-radius:var(--r);font-size:11.5px;line-height:1.5;color:var(--tx);white-space:pre;overflow:hidden}
+  .pnl .code.grow{flex:1;min-height:0}
+
+  .pnl .log{flex:none;height:118px;border-top:1px solid var(--bd);background:var(--bg)}
+  .pnl .log-h{display:flex;align-items:center;gap:8px;height:28px;padding:0 10px;background:var(--surface);border-bottom:1px solid var(--bd-soft)}
+  .pnl .lr{display:flex;align-items:center;gap:8px;height:28px;padding:0 10px;border-bottom:1px solid var(--bd-soft)}
+  .pnl .lr .t{color:var(--mu);font-size:10.5px}
+  .pnl .lr .u{font-size:11px}
+  .pnl .lr .mth{min-width:36px;padding:2px 0}
+  .pnl .st{font-family:ui-monospace,Menlo,monospace;font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:9px}
+  .pnl .st.good{color:var(--ok);background:color-mix(in srgb,var(--ok) 15%,transparent)}
+  .pnl .st.bad{color:var(--err);background:color-mix(in srgb,var(--err) 15%,transparent)}
+  .pnl .lr.warn{color:var(--warn)}
+  .pnl .lr.warn .wi{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:color-mix(in srgb,var(--warn) 20%,transparent);font-weight:700;font-size:10px}
+
+  /* ── Style A: blend into DevTools (neutral surfaces, amber accent) ── */
+  .t-native{--bg:#1e1f22;--surface:#27282c;--input:#18191c;--code:#16171a;--bd:#3b3d42;--bd-soft:#2f3136;--tx:#e6e7ea;--mu:#8d9199;--ac:#f59e0b;--ac-tx:#1a1400;--sel:rgba(245,158,11,.10);--tg-off:#4a4d54;--row:40px;--r:3px;--get:#7fd39b;--post:#f2c94c;--del:#f28b82;--ok:#7fd39b;--warn:#f2c94c;--err:#f28b82}
+
+  /* ── Style B: own brand (navy + amber, carried over from the old popup) ── */
+  .t-brand{--bg:#1a1d27;--surface:#21253a;--input:#181b28;--code:#141720;--bd:#2e3350;--bd-soft:#252840;--tx:#e2e4f0;--mu:#8a8fb0;--ac:#f59e0b;--ac-tx:#1a1d27;--sel:#21253a;--tg-off:#2e3350;--row:48px;--r:6px;--get:#10b981;--post:#f59e0b;--del:#ef4444;--ok:#10b981;--warn:#f59e0b;--err:#ef4444;font-size:13px}
+</style>
+
+<div class="options">
+
+  <div class="option" data-choice="native">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Hòa vào DevTools — nền trung tính, điểm nhấn cam</h3>
+      <p>Gọn, mật độ cao như các panel DevTools khác. Tự chuyển sáng/tối theo theme DevTools (đang hiển thị bản tối). Màu cam chỉ dành cho nút chính, công tắc bật và icon.</p>
+
+      <div class="pnl t-native">
+        <div class="bar">
+          <span class="ttl">API Mock</span>
+          <span class="search">Search rules…</span>
+          <button class="btn pri">+ Add rule</button>
+          <span class="sp"></span>
+          <span class="mu">Mocking</span><span class="tg on"></span>
+        </div>
+        <div class="main">
+          <div class="list">
+            <div class="row sel"><span class="mth GET">GET</span><span class="txt"><span class="nm">Users list</span><span class="ur">/api/users*</span></span><span class="hit">3</span><span class="tg on"></span></div>
+            <div class="row"><span class="mth POST">POST</span><span class="txt"><span class="nm">Login</span><span class="ur">/api/login</span></span><span class="hit">0</span><span class="tg on"></span></div>
+            <div class="row off"><span class="mth GET">GET</span><span class="txt"><span class="nm">Orders</span><span class="ur">https://shop.dev/api/orders/*</span></span><span class="hit">12</span><span class="tg"></span></div>
+            <div class="row"><span class="mth DELETE">DEL</span><span class="txt"><span class="nm">Delete user</span><span class="ur">/api/users/*</span></span><span class="hit">1</span><span class="tg on"></span></div>
+          </div>
+          <div class="ed">
+            <div class="ed-top"><span class="ed-name">Users list</span><span class="saved">✓ Saved</span><span class="sp"></span><span class="kebab">⋮</span></div>
+            <div class="line"><span class="selm">GET ▾</span><span class="inp grow mono">/api/users*</span></div>
+            <div class="line">
+              <label class="fld">Status<span class="inp w64 mono">500</span></label>
+              <label class="fld">Delay (ms)<span class="inp w64 mono">800</span></label>
+            </div>
+            <div class="fld">Headers<pre class="code">Content-Type: application/json
+X-Mock: 1</pre></div>
+            <div class="fld grow">
+              <div class="lbl-row">Body<span class="sp"></span><button class="btn">Format JSON</button><span class="ok">✓ Valid JSON</span></div>
+              <pre class="code grow">{
+  "error": "Internal Server Error",
+  "code": 500
+}</pre>
+            </div>
+          </div>
+        </div>
+        <div class="log">
+          <div class="log-h"><b>Log</b><span class="mu">· this tab · 3</span><span class="sp"></span><button class="btn">Clear</button></div>
+          <div class="lr"><span class="t">12:01:03</span><span class="mth GET">GET</span><span class="u">/api/users?page=2</span><span class="mu">→ Users list</span><span class="sp"></span><span class="st bad">500</span><span class="mu">800 ms</span></div>
+          <div class="lr"><span class="t">12:01:05</span><span class="mth POST">POST</span><span class="u">/api/login</span><span class="mu">→ Login</span><span class="sp"></span><span class="st good">200</span><span class="mu">0 ms</span></div>
+          <div class="lr warn"><span class="t">12:01:09</span><span class="wi">!</span><span class="u">rules-unavailable — request passed through</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option selected" data-choice="brand">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Thương hiệu riêng — navy + cam như popup cũ</h3>
+      <p>Thoáng hơn, bo góc lớn, giữ nguyên bảng màu của API Mock Master. Luôn tối, không đổi theo theme DevTools (trên DevTools theme sáng sẽ là một khối tối nổi bật).</p>
+
+      <div class="pnl t-brand">
+        <div class="bar">
+          <span class="ttl">API Mock</span>
+          <span class="search">Search rules…</span>
+          <button class="btn pri">+ Add rule</button>
+          <span class="sp"></span>
+          <span class="mu">Mocking</span><span class="tg on"></span>
+        </div>
+        <div class="main">
+          <div class="list">
+            <div class="row sel"><span class="mth GET">GET</span><span class="txt"><span class="nm">Users list</span><span class="ur">/api/users*</span></span><span class="hit">3</span><span class="tg on"></span></div>
+            <div class="row"><span class="mth POST">POST</span><span class="txt"><span class="nm">Login</span><span class="ur">/api/login</span></span><span class="hit">0</span><span class="tg on"></span></div>
+            <div class="row off"><span class="mth GET">GET</span><span class="txt"><span class="nm">Orders</span><span class="ur">https://shop.dev/api/orders/*</span></span><span class="hit">12</span><span class="tg"></span></div>
+            <div class="row"><span class="mth DELETE">DEL</span><span class="txt"><span class="nm">Delete user</span><span class="ur">/api/users/*</span></span><span class="hit">1</span><span class="tg on"></span></div>
+          </div>
+          <div class="ed">
+            <div class="ed-top"><span class="ed-name">Users list</span><span class="saved">✓ Saved</span><span class="sp"></span><span class="kebab">⋮</span></div>
+            <div class="line"><span class="selm">GET ▾</span><span class="inp grow mono">/api/users*</span></div>
+            <div class="line">
+              <label class="fld">Status<span class="inp w64 mono">500</span></label>
+              <label class="fld">Delay (ms)<span class="inp w64 mono">800</span></label>
+            </div>
+            <div class="fld">Headers<pre class="code">Content-Type: application/json
+X-Mock: 1</pre></div>
+            <div class="fld grow">
+              <div class="lbl-row">Body<span class="sp"></span><button class="btn">Format JSON</button><span class="ok">✓ Valid JSON</span></div>
+              <pre class="code grow">{
+  "error": "Internal Server Error",
+  "code": 500
+}</pre>
+            </div>
+          </div>
+        </div>
+        <div class="log">
+          <div class="log-h"><b>Log</b><span class="mu">· this tab · 3</span><span class="sp"></span><button class="btn">Clear</button></div>
+          <div class="lr"><span class="t">12:01:03</span><span class="mth GET">GET</span><span class="u">/api/users?page=2</span><span class="mu">→ Users list</span><span class="sp"></span><span class="st bad">500</span><span class="mu">800 ms</span></div>
+          <div class="lr"><span class="t">12:01:05</span><span class="mth POST">POST</span><span class="u">/api/login</span><span class="mu">→ Login</span><span class="sp"></span><span class="st good">200</span><span class="mu">0 ms</span></div>
+          <div class="lr warn"><span class="t">12:01:09</span><span class="wi">!</span><span class="u">rules-unavailable — request passed through</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</main>
+</body>
+</html>

@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>API Mock v2 — Panel states</title>
+<link rel="stylesheet" href="ui-doc.css">
+</head>
+<body>
+<main class="doc">
+<h2>Panel — các trạng thái quan trọng</h2>
+<p class="subtitle">Phong cách B. Ba trạng thái dễ thiết kế sai nhất: lần đầu dùng (rỗng), lỗi validate khi sửa rule, và log có cảnh báo. Điểm cần bạn để ý nhất: dòng nhắc "không hiện trong tab Network" ở trạng thái 1.</p>
+
+<style>
+  .mockup-body.flush{padding:0;background:transparent}
+  .pnl{--bg:#1a1d27;--surface:#21253a;--input:#181b28;--code:#141720;--bd:#2e3350;--bd-soft:#252840;--tx:#e2e4f0;--mu:#8a8fb0;--ac:#f59e0b;--ac-tx:#1a1d27;--sel:#21253a;--tg-off:#2e3350;--r:6px;--get:#10b981;--post:#f59e0b;--del:#ef4444;--ok:#10b981;--warn:#f59e0b;--err:#ef4444;
+       display:flex;flex-direction:column;background:var(--bg);color:var(--tx);border-radius:0 0 12px 12px;overflow:hidden;font:13px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;text-align:left;cursor:default}
+  .pnl *{box-sizing:border-box;margin:0}
+  .pnl .mono,.pnl pre,.pnl .mth,.pnl .ur,.pnl .u,.pnl .t{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+  .pnl .sp{flex:1}
+  .pnl .mu{color:var(--mu)}
+  .pnl b{font-weight:600}
+
+  .pnl .bar{display:flex;align-items:center;gap:10px;height:36px;padding:0 10px;background:var(--surface);border-bottom:1px solid var(--bd);flex:none}
+  .pnl .ttl{font-weight:600}
+  .pnl .search{display:flex;align-items:center;width:200px;height:24px;padding:0 8px;background:var(--input);border:1px solid var(--bd);border-radius:var(--r);color:var(--mu);font-size:12px}
+  .pnl .btn{display:inline-flex;align-items:center;height:24px;padding:0 10px;background:transparent;color:var(--tx);border:1px solid var(--bd);border-radius:var(--r);font:inherit;font-size:11px}
+  .pnl .btn.pri{background:var(--ac);border-color:transparent;color:var(--ac-tx);font-weight:600}
+  .pnl .btn.big{height:32px;padding:0 18px;font-size:12px}
+  .pnl .tg{position:relative;flex:none;width:28px;height:16px;border-radius:9px;background:var(--tg-off)}
+  .pnl .tg::after{content:"";position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#fff}
+  .pnl .tg.on{background:var(--ac)}
+  .pnl .tg.on::after{left:14px}
+
+  .pnl .main{display:flex;flex:1;min-height:0}
+  .pnl .list{flex:none;width:270px;border-right:1px solid var(--bd);overflow:hidden}
+  .pnl .row{display:flex;align-items:center;gap:8px;height:48px;padding:0 10px;border-bottom:1px solid var(--bd-soft)}
+  .pnl .row.sel{background:var(--sel);box-shadow:inset 2px 0 0 var(--ac)}
+  .pnl .txt{display:flex;flex-direction:column;flex:1;min-width:0}
+  .pnl .nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pnl .ur{font-size:10.5px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pnl .hit{min-width:20px;text-align:center;font-size:10px;padding:1px 5px;border-radius:9px;background:var(--bd-soft);color:var(--mu)}
+  .pnl .draft{font-size:10px;font-weight:600;padding:1px 6px;border-radius:9px;color:var(--err);background:color-mix(in srgb,var(--err) 15%,transparent);white-space:nowrap}
+  .pnl .mth{flex:none;min-width:40px;text-align:center;font-size:9.5px;font-weight:700;letter-spacing:.03em;padding:3px 0;border-radius:3px}
+  .pnl .mth.GET{color:var(--get);background:color-mix(in srgb,var(--get) 15%,transparent)}
+  .pnl .mth.POST{color:var(--post);background:color-mix(in srgb,var(--post) 15%,transparent)}
+  .pnl .mth.DELETE{color:var(--del);background:color-mix(in srgb,var(--del) 15%,transparent)}
+
+  .pnl .ed{flex:1;min-width:0;display:flex;flex-direction:column;gap:9px;padding:10px 12px}
+  .pnl .ed-top{display:flex;align-items:center;gap:10px}
+  .pnl .ed-name{font-size:13px;font-weight:600}
+  .pnl .saved{font-size:10.5px;color:var(--ok)}
+  .pnl .saved.bad{color:var(--err)}
+  .pnl .kebab{color:var(--mu);padding:0 4px}
+  .pnl .line{display:flex;gap:8px;align-items:flex-start}
+  .pnl .inp{display:flex;align-items:center;height:26px;padding:0 8px;background:var(--input);border:1px solid var(--bd);border-radius:var(--r)}
+  .pnl .inp.grow{flex:1}
+  .pnl .inp.w64{width:64px}
+  .pnl .inp.err,.pnl .code.err{border-color:var(--err);box-shadow:0 0 0 1px color-mix(in srgb,var(--err) 40%,transparent)}
+  .pnl .inp .ph{color:var(--mu);opacity:.7}
+  .pnl .selm{display:flex;align-items:center;gap:6px;height:26px;padding:0 8px;background:var(--input);border:1px solid var(--bd);border-radius:var(--r);font-weight:600;color:var(--post);margin-top:0}
+  .pnl .fld{display:flex;flex-direction:column;gap:3px;font-size:10.5px;color:var(--mu);text-transform:uppercase;letter-spacing:.04em}
+  .pnl .fld.grow{flex:1;min-width:0}
+  .pnl .fld .inp,.pnl .fld .code{text-transform:none;letter-spacing:0;color:var(--tx);font-size:12px}
+  .pnl .fmsg{color:var(--err);font-size:10.5px;text-transform:none;letter-spacing:0}
+  .pnl .fnote{color:var(--mu);font-size:10.5px;text-transform:none;letter-spacing:0}
+  .pnl .lbl-row{display:flex;align-items:center;gap:8px}
+  .pnl .ok{color:var(--ok);text-transform:none;letter-spacing:0;font-size:10.5px}
+  .pnl .code{padding:6px 8px;background:var(--code);border:1px solid var(--bd);border-radius:var(--r);font-size:11.5px;line-height:1.5;color:var(--tx);white-space:pre;overflow:hidden}
+  .pnl .code.grow{flex:1;min-height:0}
+  .pnl .code .ph{color:var(--mu);opacity:.6}
+
+  .pnl .empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:18px 24px;text-align:center}
+  .pnl .empty svg{width:38px;height:38px;color:var(--mu);opacity:.5}
+  .pnl .empty h4{font-size:14px;font-weight:600}
+  .pnl .empty p{color:var(--mu);max-width:440px}
+  .pnl .hint{max-width:470px;padding:8px 12px;border:1px solid color-mix(in srgb,var(--ac) 30%,transparent);background:color-mix(in srgb,var(--ac) 8%,transparent);border-radius:var(--r);font-size:12px;color:var(--tx)}
+
+  .pnl .log{flex:none;border-top:1px solid var(--bd);background:var(--bg)}
+  .pnl .log-h{display:flex;align-items:center;gap:8px;height:30px;padding:0 10px;background:var(--surface);border-bottom:1px solid var(--bd-soft)}
+  .pnl .chip{font-size:10.5px;padding:2px 9px;border-radius:9px;border:1px solid var(--bd);color:var(--mu)}
+  .pnl .chip.on{background:var(--sel);color:var(--tx);border-color:var(--ac)}
+  .pnl .lr{display:flex;align-items:center;gap:8px;min-height:30px;padding:4px 10px;border-bottom:1px solid var(--bd-soft)}
+  .pnl .lr.none{justify-content:center;color:var(--mu);min-height:44px}
+  .pnl .lr .t{color:var(--mu);font-size:10.5px;flex:none}
+  .pnl .lr .u{font-size:11px}
+  .pnl .lr .mth{min-width:36px;padding:2px 0}
+  .pnl .st{font-family:ui-monospace,Menlo,monospace;font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:9px}
+  .pnl .st.good{color:var(--ok);background:color-mix(in srgb,var(--ok) 15%,transparent)}
+  .pnl .st.bad{color:var(--err);background:color-mix(in srgb,var(--err) 15%,transparent)}
+  .pnl .lr.warn{color:var(--warn)}
+  .pnl .lr.fail{color:var(--err)}
+  .pnl .ic{flex:none;display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;font-weight:700;font-size:10px}
+  .pnl .lr.warn .ic{background:color-mix(in srgb,var(--warn) 20%,transparent)}
+  .pnl .lr.fail .ic{background:color-mix(in srgb,var(--err) 20%,transparent)}
+  .pnl .lr .why{color:var(--mu);font-size:11px}
+</style>
+
+<div class="section">
+  <div class="mockup">
+    <div class="mockup-header">1 · Lần đầu dùng — chưa có rule nào</div>
+    <div class="mockup-body flush">
+      <div class="pnl" style="height:330px">
+        <div class="bar">
+          <span class="ttl">API Mock</span>
+          <span class="search">Search rules…</span>
+          <button class="btn pri">+ Add rule</button>
+          <span class="sp"></span>
+          <span class="mu">Mocking</span><span class="tg on"></span>
+        </div>
+        <div class="main">
+          <div class="empty">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 9l3 3-3 3M13 15h3M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z"/></svg>
+            <h4>No rules yet</h4>
+            <p>Add a rule to answer matching <span class="mono">fetch</span> / <span class="mono">XHR</span> requests with your own response.</p>
+            <div class="hint">Mocked requests are answered inside the page, so they <b>won't appear in the Network tab</b>. Watch them in the Log below.</div>
+            <button class="btn pri big">+ Add your first rule</button>
+          </div>
+        </div>
+        <div class="log">
+          <div class="log-h"><b>Log</b><span class="mu">· this tab · 0</span><span class="sp"></span><button class="btn">Clear</button></div>
+          <div class="lr none">No mocked requests on this tab yet.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">2 · Đang sửa rule, có lỗi validate — chưa lưu, chưa áp dụng</div>
+    <div class="mockup-body flush">
+      <div class="pnl" style="height:392px">
+        <div class="bar">
+          <span class="ttl">API Mock</span>
+          <span class="search">Search rules…</span>
+          <button class="btn pri">+ Add rule</button>
+          <span class="sp"></span>
+          <span class="mu">Mocking</span><span class="tg on"></span>
+        </div>
+        <div class="main">
+          <div class="list">
+            <div class="row sel"><span class="mth POST">POST</span><span class="txt"><span class="nm">New rule</span><span class="ur">(no URL yet)</span></span><span class="draft">Not applied</span><span class="tg on"></span></div>
+            <div class="row"><span class="mth POST">POST</span><span class="txt"><span class="nm">Login</span><span class="ur">/api/login</span></span><span class="hit">0</span><span class="tg on"></span></div>
+          </div>
+          <div class="ed">
+            <div class="ed-top"><span class="ed-name">New rule</span><span class="saved bad">● Not saved — fix 2 errors</span><span class="sp"></span><span class="kebab">⋮</span></div>
+            <div class="line">
+              <span class="selm">POST ▾</span>
+              <div class="fld grow"><span class="inp err mono"><span class="ph">https://api.example.com/users  or  /api/users*</span></span><span class="fmsg">URL is required</span></div>
+            </div>
+            <div class="line">
+              <div class="fld">Status<span class="inp w64 err mono">700</span><span class="fmsg">Must be 200–599</span></div>
+              <div class="fld">Delay (ms)<span class="inp w64 mono">0</span></div>
+            </div>
+            <div class="fld">Headers<pre class="code"><span class="ph">Key: Value   (one per line)</span></pre></div>
+            <div class="fld grow">
+              <div class="lbl-row">Body<span class="sp"></span><button class="btn">Format JSON</button><span class="fnote">Not JSON — sent as text/plain</span></div>
+              <pre class="code grow">Created!</pre>
+            </div>
+          </div>
+        </div>
+        <div class="log" style="height:0;border:0"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">3 · Log có cảnh báo và lỗi engine (phần Log khi mở rộng)</div>
+    <div class="mockup-body flush">
+      <div class="pnl">
+        <div class="log" style="border-top:0">
+          <div class="log-h"><b>Log</b><span class="mu">· this tab · 5</span><span class="chip on">All</span><span class="chip">Mocked 3</span><span class="chip">Issues 2</span><span class="sp"></span><button class="btn">Clear</button></div>
+          <div class="lr"><span class="t">12:01:03</span><span class="mth GET">GET</span><span class="u">/api/users?page=2</span><span class="mu">→ Users list</span><span class="sp"></span><span class="st bad">500</span><span class="mu">800 ms</span></div>
+          <div class="lr"><span class="t">12:01:05</span><span class="mth POST">POST</span><span class="u">/api/login</span><span class="mu">→ Login</span><span class="sp"></span><span class="st good">200</span><span class="mu">0 ms</span></div>
+          <div class="lr warn"><span class="t">12:01:09</span><span class="ic">!</span><span class="u">rules-unavailable</span><span class="why">Rules didn't load in time — request passed through to the network</span></div>
+          <div class="lr"><span class="t">12:02:11</span><span class="mth GET">GET</span><span class="u">/api/orders/42</span><span class="mu">→ Orders</span><span class="sp"></span><span class="st good">200</span><span class="mu">120 ms</span></div>
+          <div class="lr fail"><span class="t">12:02:15</span><span class="ic">×</span><span class="u">engine-error</span><span class="why">Rule "Orders": couldn't build the response — request passed through</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</main>
+</body>
+</html>

@@ -3,6 +3,7 @@
 - **Ngày:** 2026-09-21
 - **Trạng thái:** chờ duyệt
 - **Tên tạm:** API Mock v2 (thư mục `api-mock-v2`, đổi tên được)
+- **UI:** xem [`2026-09-21-api-mock-v2-ui-design.md`](2026-09-21-api-mock-v2-ui-design.md)
 - **Tham khảo:** `~/Study/MAPI/mock-extension` ("API Mock Master" v1.1.0, đã trim về core-only ở commit `d3d0de5`). README và CLAUDE.md của bản đó còn mô tả groups, drag-drop, import/export đã bị bỏ khỏi code, nên chỉ dùng **code** làm nguồn tham chiếu.
 
 ## 1. Mục tiêu và phạm vi
@@ -34,6 +35,9 @@ Extension Chrome (Manifest V3) chặn `fetch` và `XMLHttpRequest` tới URL b�
 | 4 | Chỉ page engine, không làm DNR | Bạn chọn phương án đơn giản nhất, chấp nhận không bắt request không phải fetch/XHR |
 | 5 | Không build step (T1), test e2e bằng Playwright + Chromium | Engine chỉ vài trăm dòng. Bản cũ từng phải lùi về cấu trúc phẳng vì nhảy file quá nhiều (MEMORY.md, 2026-08-23). Nâng lên esbuild + `node:test` nếu engine vượt khoảng 500 dòng |
 | 6 | Editor ở DevTools panel, popup chỉ điều khiển nhanh | Popup tối đa 800×600 và đóng khi mất focus, dở cho việc gõ JSON body |
+| 7 | Phong cách thị giác B: navy + cam, luôn tối (không phải A: hòa vào DevTools) | Bạn chọn B. Hệ quả chấp nhận: trên DevTools theme sáng, panel là một khối tối nổi bật |
+| 8 | Popup có dải trạng thái cho tab hiện tại, kiểm tra tab bằng `PING` | Engine im lặng nên popup và badge là nơi duy nhất cho biết mock có chạy không. `PING` phản ánh đúng thực tế, còn suy luận từ `PAGE_START` sẽ sai khi tab điều hướng sang trang không hỗ trợ (`chrome://`) |
+| 9 | Badge theo thứ tự ưu tiên `OFF` > `!` > số request đã mock | Sự cố không bị bỏ sót khi không mở DevTools |
 
 ## 3. Kiến trúc và luồng dữ liệu
 
@@ -68,6 +72,7 @@ Ba ngữ cảnh chạy như bản cũ, nhưng **service worker không nằm trê
   - engine → bridge: `MOCK_EVENT { ruleId, url, method, status, ts }`, `RULES_UNAVAILABLE`, `ENGINE_ERROR { message, ruleId? }`
 - Bridge → service worker (`runtime.sendMessage`): các sự kiện trên và `PAGE_START`. Service worker lấy `tabId` từ `sender.tab.id`.
 - UI → service worker: `SAVE_RULE`, `DELETE_RULE`, `REORDER { id, dir }`, `SET_GLOBAL`, `CLEAR_LOG { tabId }`. UI **đọc** state, hits và log trực tiếp từ storage và render lại khi `storage.onChanged`.
+- Popup → bridge của tab đang hoạt động (`chrome.tabs.sendMessage`): `PING`. Bridge trả `{ ok: true }`, không kèm dữ liệu. Không có phản hồi nghĩa là tab chưa có engine (tab mở trước khi cài hoặc cập nhật extension, hoặc trang không hỗ trợ như `chrome://`).
 - Mọi handler `onMessage` trả `true` để giữ kênh `sendResponse` mở.
 
 **Khác bản cũ**
@@ -85,6 +90,7 @@ Ba ngữ cảnh chạy như bản cũ, nhưng **service worker không nằm trê
 | `storage.local` | `state` | `State` (bên dưới) | Service worker (theo yêu cầu từ UI) |
 | `storage.local` | `hits` | `Record<ruleId, number>` | Service worker, debounce khoảng 1 giây |
 | `storage.session` | `log:<tabId>` | Tối đa 200 `LogEntry`, cũ nhất bị bỏ trước | Service worker, debounce khoảng 200ms |
+| `storage.session` | `tab:<tabId>` | `{ mocked: number, issues: number }` (xem mục 6.3) | Service worker |
 
 `hits` tách khỏi `state` vì bridge lắng nghe `storage.onChanged` trên `state` để đẩy lại rule vào mọi frame. Nếu hit count nằm chung, mỗi request bị mock sẽ kích hoạt một lần đẩy lại toàn bộ rule, và ghi hit có thể đè lên thay đổi vừa sửa từ UI.
 
@@ -171,41 +177,31 @@ Nguyên tắc: request **không khớp** chạy y hệt bản gốc. Request **k
 
 ## 6. UI
 
-**Chia vai:** DevTools panel là nơi làm việc chính. Popup chỉ là điều khiển nhanh.
+Thiết kế UI chi tiết (phong cách thị giác, các trạng thái, chuỗi chữ, mockup) nằm ở [`2026-09-21-api-mock-v2-ui-design.md`](2026-09-21-api-mock-v2-ui-design.md). Mục này chỉ giữ các hợp đồng ảnh hưởng tới kiến trúc.
 
-### 6.1 Panel "API Mock" (`panel/`)
+**Chia vai:** DevTools panel "API Mock" là nơi làm việc chính (danh sách rule, editor, log). Popup chỉ là điều khiển nhanh, không có editor. Phong cách thị giác: navy + cam, luôn tối (quyết định #7).
 
-```
-┌ Rules ───────────────┬ Editor ────────────────────────────┐
-│ [+]  tìm…            │ Tên: Users list                [⋮] │
-│ ▸ GET   /api/users ● │ [GET ▾] [/api/users*             ] │
-│   POST  /api/login ○ │ Status [500]      Delay [800] ms   │
-│   …                  │ Headers   Key: Value (mỗi dòng)    │
-│                      │ Body      [Format JSON]  ✓ JSON    │
-├ Log ─────────────────┴────────────────────────────────────┤
-│ 12:01:03  GET /api/users → "Users list" · 500 · 800ms     │
-│ 12:01:09  ! rules-unavailable (request đã đi qua)         │
-└───────────────────────────────────────────────────────────┘
-```
+### 6.1 Panel (`panel/`)
 
-- Rule tự lưu (debounce 700ms như bản cũ, không có nút Save), đổi tên inline, sắp xếp bằng nút lên/xuống trong menu ⋮.
-- Validate ngay tại chỗ (mục 4.1). Giá trị sai thì báo lỗi và không lưu.
-- Header hiển thị và sửa dưới dạng các dòng `Key: Value`, lưu dưới dạng mảng `{ name, value }`.
-- Log của tab đang inspect (`chrome.devtools.inspectedWindow.tabId`), đọc từ `storage.session`. Log giữ qua các lần điều hướng, xoá bằng nút Clear hoặc khi tab đóng. `unavailable` và `error` hiện khác màu.
+- Rule tự lưu (debounce 700ms, không có nút Save). Giá trị sai (mục 4.1) thì báo lỗi tại chỗ, không lưu và không đẩy vào engine. Rule đang sửa hiện là bản nháp. Bản nháp chỉ tồn tại trong panel, đóng DevTools thì mất.
+- Header hiển thị và sửa dưới dạng các dòng `Key: Value`, lưu dưới dạng mảng `{ name, value }`. Đổi tên inline, sắp xếp bằng menu ⋮ (lên/xuống).
+- Log của tab đang inspect (`chrome.devtools.inspectedWindow.tabId`), đọc từ `storage.session`. Log giữ qua các lần điều hướng, xoá bằng nút Clear hoặc khi tab đóng. Có bộ lọc All / Mocked / Issues.
+- Trạng thái rỗng phải nói rõ request bị mock không hiện trong tab Network.
 
 ### 6.2 Popup (`popup/`)
 
-- Công tắc tổng, danh sách rule với công tắc từng rule và hit count, cảnh báo nếu tab hiện tại có log `unavailable` hoặc `error`, và một dòng nhắc "Sửa rule: DevTools → tab API Mock". Popup không có editor.
+- Công tắc tổng, dải trạng thái cho tab hiện tại, danh sách rule với công tắc từng rule và hit count. Không có editor.
+- Popup hỏi tab đang hoạt động có engine không bằng `PING` (mục 3). Cùng với công tắc tổng và bộ đếm `tab:<tabId>`, kết quả quyết định dải trạng thái theo thứ tự ưu tiên ở UI doc mục 4.
 
 ### 6.3 Icon và badge
 
 - Icon vẽ lúc chạy bằng `OffscreenCanvas` như bản cũ (cam = bật, xám = tắt). Không có file PNG.
-- Khi tắt toàn cục, badge hiện `OFF`. Khi bật, badge theo tab hiện **số request đã bị mock kể từ lần tải trang cấp cao nhất gần nhất** (để trống nếu bằng 0). Bộ đếm reset khi service worker nhận `PAGE_START` từ frame cấp cao nhất của tab đó. Vì engine im lặng, đây là dấu hiệu duy nhất ngoài popup cho biết mock đang chạy.
-- Service worker dọn log và bộ đếm của tab khi `chrome.tabs.onRemoved`.
+- Badge theo tab, thứ tự ưu tiên: `OFF` (tắt toàn cục) > `!` (tab có sự cố) > số request đã bị mock kể từ lần tải trang cấp cao nhất gần nhất (để trống nếu bằng 0).
+- Bộ đếm nằm ở `storage.session`, key `tab:<tabId>` = `{ mocked, issues }`. `MOCK_EVENT` tăng `mocked`. `RULES_UNAVAILABLE` và `ENGINE_ERROR` tăng `issues`. Cả hai reset khi service worker nhận `PAGE_START` của tab đó. Nút Clear của log đặt lại `issues` về 0. Service worker dọn khi `chrome.tabs.onRemoved`.
 
 ### 6.4 Đồng bộ
 
-Popup và panel đọc `state`, `hits`, `log:<tabId>` từ storage và render lại khi `storage.onChanged`. Mọi thao tác ghi đi qua service worker, tức chỉ có một writer, nên popup và panel sửa cùng lúc không đè nhau.
+Popup và panel đọc `state`, `hits`, `log:<tabId>`, `tab:<tabId>` từ storage và render lại khi `storage.onChanged`. Mọi thao tác ghi đi qua service worker, tức chỉ có một writer, nên popup và panel sửa cùng lúc không đè nhau.
 
 ## 7. Bảo mật và riêng tư
 
@@ -230,7 +226,7 @@ api-mock-v2/
 ├── popup/               # popup.html/.js/.css — điều khiển nhanh
 ├── shared/rule.js       # schema, mặc định, validate (SW/popup/panel dùng)
 ├── test/                # e2e + trang test + server cục bộ
-└── docs/superpowers/specs/
+└── docs/superpowers/    # specs/ (thiết kế) và ui/ (mockup HTML)
 ```
 
 - `engine.js` và `bridge.js` là content script khai báo trong manifest nên phải là classic script (không `import`). Service worker, popup và panel dùng được ES module. Vì vậy engine tự chứa, `shared/` chỉ phục vụ ba nơi còn lại.
@@ -272,6 +268,7 @@ Playwright + **Chromium** chạy extension thật. Dùng Chromium chứ không p
 5. **Cập nhật nóng:** sửa rule thì request kế tiếp dùng bản mới mà không cần reload. Hit count tăng mà không kích hoạt đẩy lại rule.
 6. **Riêng tư:** listener `message` do trang đăng ký sau không nhận được `RULES`. `MOCK_EVENT` giả mạo từ trang bị bridge loại bỏ hoặc giới hạn, không làm hỏng log và hit count.
 7. **Smoke UI:** mở `panel.html` và `popup.html` ở `chrome-extension://<id>/…` (Playwright không điều khiển được khung DevTools thật nhưng điều khiển được chính trang đó). Thêm rule qua UI, request bị mock, log có dòng tương ứng.
+8. **Popup và badge:** thứ tự ưu tiên của badge (`OFF` > `!` > số đếm), bộ đếm reset khi tải lại trang, `PING` có phản hồi ở tab có engine và không có phản hồi ở tab chưa có engine, dải trạng thái đúng cho cả 5 trạng thái.
 
 Không tự động hoá: việc nhúng panel vào DevTools thật, kiểm tay một lần.
 
@@ -286,9 +283,11 @@ Các điểm dưới đây chưa được kiểm chứng. Plan phải có bướ
 5. `Object.defineProperty(response, 'url', …)` hoạt động trên `Response` dựng tay.
 6. Sự kiện XHR mô phỏng bằng `dispatchEvent` kích hoạt được các thuộc tính `on*`.
 7. Chrome 111+ hỗ trợ `world: "MAIN"` (theo README bản cũ).
+8. `chrome.tabs.sendMessage` tới tab đang hoạt động dùng được mà không cần quyền `tabs` và bridge nhận được `PING` từ popup. `chrome.action.setBadgeTextColor` (Chrome 110+) đặt được màu chữ badge.
 
 ## 12. Câu hỏi mở (chưa bàn)
 
 1. **Phạm vi theo trang:** rule hiện là toàn cục như bản cũ. Rule dạng `/path` sẽ mock cả trên những site không liên quan (ví dụ `/api/users` trên một site bất kỳ). Có muốn thêm danh sách trang được áp dụng cho rule (hoặc cho công tắc tổng) không?
 2. **Import/export rule** và nhập dữ liệu từ API Mock Master (v1.1.0 từng có import/export rồi bị trim).
 3. **Tên chính thức và icon** (dự kiến dùng lại kiểu icon vẽ lúc chạy).
+4. **Mặc định UI cần xác nhận** (ngôn ngữ giao diện, tên hiển thị, bản nháp mất khi đóng DevTools, nút Clear đặt lại bộ đếm sự cố): xem UI doc mục 10.

@@ -11,6 +11,7 @@
 
   const NS = '__API_MOCK__/';
   const nativeFetch = window.fetch;
+  const nativeStopImmediate = Event.prototype.stopImmediatePropagation;
   const state = { rules: [], rulesLoaded: false, gaveUp: false };
 
   // ── Reporting ────────────────────────────────────────────────────────────
@@ -168,7 +169,7 @@
       if (ev.source !== window) return;
       const d = ev.data;
       if (!d || d.type !== NS + 'RULES') return;
-      ev.stopImmediatePropagation();
+      Reflect.apply(nativeStopImmediate, ev, []);
       loadRules(d.rules);
     },
     true,

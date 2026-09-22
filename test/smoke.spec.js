@@ -1,5 +1,5 @@
 const { test, expect } = require('./fixtures');
-const { openExtensionPage, rule, pushRules } = require('./helpers');
+const { openExtensionPage, rule, pushRules, setState } = require('./helpers');
 
 test('extension loads with a running service worker and the minimal manifest', async ({ extensionId, serviceWorker }) => {
   expect(extensionId).toMatch(/^[a-p]{32}$/);
@@ -10,10 +10,12 @@ test('extension loads with a running service worker and the minimal manifest', a
   expect(manifest.minimum_chrome_version).toBe('111');
 });
 
-test('engine content script runs in the MAIN world of a plain http page (spec assumptions 1 and 7)', async ({ context, server }) => {
+test('engine content script runs in the MAIN world of a plain http page (spec assumptions 1 and 7)', async ({ context, server, serviceWorker }) => {
+  const rules = [rule({ url: '/mocked' })];
+  await setState(serviceWorker, { rules });
   const page = await context.newPage();
   await page.goto(server.origin + '/');
-  await pushRules(page, [rule({ url: '/mocked' })]);
+  await pushRules(page, rules);
   expect(await page.evaluate(() => fetch('/mocked').then((r) => r.text()))).toBe('{"mocked":true}');
 });
 

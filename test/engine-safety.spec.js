@@ -222,4 +222,21 @@ test.describe('engine: privacy (spec assumption 2)', () => {
     expect(Object.keys(ev).sort()).toEqual(['method', 'ruleId', 'status', 'ts', 'type', 'url']);
     expect(JSON.stringify(ev)).not.toContain('secret');
   });
+
+  test('a page that overwrites Event.prototype.stopImmediatePropagation still cannot observe RULES', async ({ enginePage, server }) => {
+    await open(enginePage, server);
+    await enginePage.evaluate(() => {
+      // Attack: neuter the prototype method the engine's listener would normally call.
+      Event.prototype.stopImmediatePropagation = function () {};
+      window.__seen = [];
+      window.addEventListener('message', (e) => window.__seen.push(e.data));
+    });
+    await pushRules(enginePage, [rule({ id: 's1', name: 'Secret name', url: '/mocked', response: { body: 'secret-body' } })]);
+    await doFetch(enginePage, '/mocked');
+    await expect.poll(() => enginePage.evaluate(() => window.__seen.some((d) => d && d.type === '__API_MOCK__/MOCK_EVENT'))).toBe(true);
+
+    const seen = await enginePage.evaluate(() => window.__seen);
+    expect(seen.some((d) => d && d.type === '__API_MOCK__/RULES')).toBe(false);
+    expect(seen.some((d) => d && d.type === '__API_MOCK__/MOCK_EVENT')).toBe(true);
+  });
 });

@@ -1,8 +1,9 @@
 const { test, expect } = require('./fixtures');
-const { rule, pushRules } = require('./helpers');
+const { rule, pushRules, setState } = require('./helpers');
 
-async function openWithRules({ context, server }, rules) {
+async function openWithRules({ context, server, serviceWorker }, rules) {
   server.requests.length = 0;
+  await setState(serviceWorker, { rules });
   const page = await context.newPage();
   await page.goto(server.origin + '/');
   await pushRules(page, rules);
@@ -52,8 +53,8 @@ const runXhr = (page, { method = 'GET', url, responseType = '' }) =>
   );
 
 test.describe('engine: XMLHttpRequest', () => {
-  test('a matching request is answered without touching the network', async ({ context, server }) => {
-    const page = await openWithRules({ context, server }, [rule({ url: '/mocked' })]);
+  test('a matching request is answered without touching the network', async ({ context, server, serviceWorker }) => {
+    const page = await openWithRules({ context, server, serviceWorker }, [rule({ url: '/mocked' })]);
     const out = await runXhr(page, { url: '/mocked' });
     expect(out).toMatchObject({
       status: 200,
@@ -65,15 +66,15 @@ test.describe('engine: XMLHttpRequest', () => {
     expect(server.requests.some((r) => r.includes('/mocked'))).toBe(false);
   });
 
-  test('a non-matching request goes to the server untouched', async ({ context, server }) => {
-    const page = await openWithRules({ context, server }, [rule({ url: '/mocked' })]);
+  test('a non-matching request goes to the server untouched', async ({ context, server, serviceWorker }) => {
+    const page = await openWithRules({ context, server, serviceWorker }, [rule({ url: '/mocked' })]);
     const out = await runXhr(page, { url: '/api/other' });
     expect(out.text).toContain('"source":"server"');
     expect(server.requests).toContain('GET /api/other');
   });
 
-  test('event order matches a real request', async ({ context, server }) => {
-    const page = await openWithRules({ context, server }, [rule({ url: '/mocked' })]);
+  test('event order matches a real request', async ({ context, server, serviceWorker }) => {
+    const page = await openWithRules({ context, server, serviceWorker }, [rule({ url: '/mocked' })]);
     const out = await runXhr(page, { url: '/mocked' });
     expect(out.events).toEqual([
       'readystatechange:1',
@@ -87,9 +88,9 @@ test.describe('engine: XMLHttpRequest', () => {
     ]);
   });
 
-  test('responseType: text, json, arraybuffer and blob', async ({ context, server }) => {
+  test('responseType: text, json, arraybuffer and blob', async ({ context, server, serviceWorker }) => {
     const body = '{"a":"é"}'; // 10 bytes in UTF-8
-    const page = await openWithRules({ context, server }, [rule({ url: '/mocked', response: { body } })]);
+    const page = await openWithRules({ context, server, serviceWorker }, [rule({ url: '/mocked', response: { body } })]);
 
     const text = await runXhr(page, { url: '/mocked' });
     expect([text.text, text.kind]).toEqual([body, '[object String]']);
@@ -105,8 +106,8 @@ test.describe('engine: XMLHttpRequest', () => {
     expect([blob.blobSize, blob.blobType]).toEqual([10, 'application/json']);
   });
 
-  test('response headers are readable, case-insensitively, and only after headers are received', async ({ context, server }) => {
-    const page = await openWithRules({ context, server }, [
+  test('response headers are readable, case-insensitively, and only after headers are received', async ({ context, server, serviceWorker }) => {
+    const page = await openWithRules({ context, server, serviceWorker }, [
       rule({
         url: '/mocked',
         response: { headers: [{ name: 'X-A', value: '1' }, { name: 'Content-Type', value: 'text/plain' }] },
@@ -127,8 +128,8 @@ test.describe('engine: XMLHttpRequest', () => {
     expect(early).toEqual([null, '', 1, 0]);
   });
 
-  test('on* handler properties fire for synthetic events (spec assumption 6)', async ({ context, server }) => {
-    const page = await openWithRules({ context, server }, [rule({ url: '/mocked' })]);
+  test('on* handler properties fire for synthetic events (spec assumption 6)', async ({ context, server, serviceWorker }) => {
+    const page = await openWithRules({ context, server, serviceWorker }, [rule({ url: '/mocked' })]);
     const seen = await page.evaluate(
       () =>
         new Promise((resolve) => {
@@ -144,8 +145,8 @@ test.describe('engine: XMLHttpRequest', () => {
     expect(seen).toEqual(['rs1', 'rs2', 'rs3', 'rs4', 'load']);
   });
 
-  test('delay: only loadstart fires before it elapses', async ({ context, server }) => {
-    const page = await openWithRules({ context, server }, [rule({ url: '/mocked', response: { delay: 300 } })]);
+  test('delay: only loadstart fires before it elapses', async ({ context, server, serviceWorker }) => {
+    const page = await openWithRules({ context, server, serviceWorker }, [rule({ url: '/mocked', response: { delay: 300 } })]);
     const out = await page.evaluate(
       () =>
         new Promise((resolve) => {
@@ -164,8 +165,8 @@ test.describe('engine: XMLHttpRequest', () => {
     expect(out.elapsed).toBeGreaterThanOrEqual(250);
   });
 
-  test('abort() during the delay cancels the mock', async ({ context, server }) => {
-    const page = await openWithRules({ context, server }, [rule({ url: '/mocked', response: { delay: 200 } })]);
+  test('abort() during the delay cancels the mock', async ({ context, server, serviceWorker }) => {
+    const page = await openWithRules({ context, server, serviceWorker }, [rule({ url: '/mocked', response: { delay: 200 } })]);
     const out = await page.evaluate(
       () =>
         new Promise((resolve) => {
@@ -183,8 +184,8 @@ test.describe('engine: XMLHttpRequest', () => {
     expect(out.status).toBe(0);
   });
 
-  test('keeps native identity: instanceof, constants, prototype and upload', async ({ context, server }) => {
-    const page = await openWithRules({ context, server }, []);
+  test('keeps native identity: instanceof, constants, prototype and upload', async ({ context, server, serviceWorker }) => {
+    const page = await openWithRules({ context, server, serviceWorker }, []);
     const out = await page.evaluate(() => {
       const x = new XMLHttpRequest();
       return {
@@ -199,8 +200,8 @@ test.describe('engine: XMLHttpRequest', () => {
     expect(out).toEqual({ instance: true, done: 4, proto: true, sendLength: 0, openLength: 2, upload: 'object' });
   });
 
-  test('re-opening the same instance for a non-matching URL uses the network again', async ({ context, server }) => {
-    const page = await openWithRules({ context, server }, [rule({ url: '/mocked' })]);
+  test('re-opening the same instance for a non-matching URL uses the network again', async ({ context, server, serviceWorker }) => {
+    const page = await openWithRules({ context, server, serviceWorker }, [rule({ url: '/mocked' })]);
     const seq = await page.evaluate(
       () =>
         new Promise((resolve) => {
@@ -223,8 +224,8 @@ test.describe('engine: XMLHttpRequest', () => {
     expect(seq[1]).toContain('"source":"server"');
   });
 
-  test('synchronous XHR returns at once, ignores the delay and fires no events', async ({ context, server }) => {
-    const page = await openWithRules({ context, server }, [rule({ url: '/mocked', response: { delay: 500 } })]);
+  test('synchronous XHR returns at once, ignores the delay and fires no events', async ({ context, server, serviceWorker }) => {
+    const page = await openWithRules({ context, server, serviceWorker }, [rule({ url: '/mocked', response: { delay: 500 } })]);
     const out = await page.evaluate(() => {
       const x = new XMLHttpRequest();
       x.open('GET', '/mocked', false);
@@ -236,8 +237,8 @@ test.describe('engine: XMLHttpRequest', () => {
     expect(out.elapsed).toBeLessThan(200);
   });
 
-  test('open(method, url, undefined) is asynchronous, as in browsers', async ({ context, server }) => {
-    const page = await openWithRules({ context, server }, [rule({ url: '/mocked' })]);
+  test('open(method, url, undefined) is asynchronous, as in browsers', async ({ context, server, serviceWorker }) => {
+    const page = await openWithRules({ context, server, serviceWorker }, [rule({ url: '/mocked' })]);
     const readyState = await page.evaluate(() => {
       const x = new XMLHttpRequest();
       x.open('GET', '/mocked', undefined);
@@ -247,8 +248,8 @@ test.describe('engine: XMLHttpRequest', () => {
     expect(readyState).toBe(1);
   });
 
-  test('send() twice on a mocked request throws InvalidStateError', async ({ context, server }) => {
-    const page = await openWithRules({ context, server }, [rule({ url: '/mocked', response: { delay: 100 } })]);
+  test('send() twice on a mocked request throws InvalidStateError', async ({ context, server, serviceWorker }) => {
+    const page = await openWithRules({ context, server, serviceWorker }, [rule({ url: '/mocked', response: { delay: 100 } })]);
     const name = await page.evaluate(() => {
       const x = new XMLHttpRequest();
       x.open('GET', '/mocked');
@@ -263,8 +264,8 @@ test.describe('engine: XMLHttpRequest', () => {
     expect(name).toBe('InvalidStateError');
   });
 
-  test('emits a MOCK_EVENT for a mocked XHR', async ({ context, server }) => {
-    const page = await openWithRules({ context, server }, [rule({ id: 'x1', url: '/mocked', response: { status: 203 } })]);
+  test('emits a MOCK_EVENT for a mocked XHR', async ({ context, server, serviceWorker }) => {
+    const page = await openWithRules({ context, server, serviceWorker }, [rule({ id: 'x1', url: '/mocked', response: { status: 203 } })]);
     await page.evaluate(() => {
       window.__events = [];
       window.addEventListener('message', (e) => {

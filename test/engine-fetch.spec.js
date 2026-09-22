@@ -1,8 +1,9 @@
 const { test, expect } = require('./fixtures');
-const { rule, pushRules } = require('./helpers');
+const { rule, pushRules, setState } = require('./helpers');
 
-async function openWithRules({ context, server }, rules) {
+async function openWithRules({ context, server, serviceWorker }, rules) {
   server.requests.length = 0;
+  await setState(serviceWorker, { rules });
   const page = await context.newPage();
   await page.goto(server.origin + '/');
   await pushRules(page, rules);
@@ -21,49 +22,49 @@ const doFetch = (page, url, init) =>
 const isMocked = (result) => !result.text.includes('"source":"server"');
 
 test.describe('engine: matching and basic mocking (fetch)', () => {
-  test('answers a matching request without touching the network', async ({ context, server }) => {
-    const page = await openWithRules({ context, server }, [
+  test('answers a matching request without touching the network', async ({ context, server, serviceWorker }) => {
+    const page = await openWithRules({ context, server, serviceWorker }, [
       rule({ url: '/mocked', response: { status: 201, body: 'hello' } }),
     ]);
     expect(await doFetch(page, '/mocked')).toEqual({ status: 201, text: 'hello' });
     expect(server.requests.some((r) => r.includes('/mocked'))).toBe(false);
   });
 
-  test('passes non-matching requests through to the server', async ({ context, server }) => {
-    const page = await openWithRules({ context, server }, [rule({ url: '/mocked' })]);
+  test('passes non-matching requests through to the server', async ({ context, server, serviceWorker }) => {
+    const page = await openWithRules({ context, server, serviceWorker }, [rule({ url: '/mocked' })]);
     const res = await doFetch(page, '/api/other');
     expect(res.text).toContain('"source":"server"');
     expect(server.requests).toContain('GET /api/other');
   });
 
-  test('an empty rule list mocks nothing', async ({ context, server }) => {
-    const page = await openWithRules({ context, server }, []);
+  test('an empty rule list mocks nothing', async ({ context, server, serviceWorker }) => {
+    const page = await openWithRules({ context, server, serviceWorker }, []);
     expect(isMocked(await doFetch(page, '/mocked'))).toBe(false);
   });
 
-  test('a path-only pattern matches relative URLs and any origin', async ({ context, server }) => {
-    const page = await openWithRules({ context, server }, [rule({ url: '/api/users' })]);
+  test('a path-only pattern matches relative URLs and any origin', async ({ context, server, serviceWorker }) => {
+    const page = await openWithRules({ context, server, serviceWorker }, [rule({ url: '/api/users' })]);
     expect(isMocked(await doFetch(page, '/api/users'))).toBe(true);
     expect(isMocked(await doFetch(page, server.origin + '/api/users'))).toBe(true);
     // A different origin that does not even resolve: proves no network request is made.
     expect(isMocked(await doFetch(page, 'https://example.invalid/api/users'))).toBe(true);
   });
 
-  test('a full-URL wildcard pattern ignores the query string when it has no "?"', async ({ context, server }) => {
-    const page = await openWithRules({ context, server }, [rule({ url: `${server.origin}/api/*` })]);
+  test('a full-URL wildcard pattern ignores the query string when it has no "?"', async ({ context, server, serviceWorker }) => {
+    const page = await openWithRules({ context, server, serviceWorker }, [rule({ url: `${server.origin}/api/*` })]);
     expect(isMocked(await doFetch(page, '/api/x?y=1'))).toBe(true);
     expect(isMocked(await doFetch(page, '/other/x'))).toBe(false);
   });
 
-  test('a pattern with "?" is compared against the full URL including the query', async ({ context, server }) => {
-    const page = await openWithRules({ context, server }, [rule({ url: '/search?q=*' })]);
+  test('a pattern with "?" is compared against the full URL including the query', async ({ context, server, serviceWorker }) => {
+    const page = await openWithRules({ context, server, serviceWorker }, [rule({ url: '/search?q=*' })]);
     expect(isMocked(await doFetch(page, '/search?q=abc'))).toBe(true);
     expect(isMocked(await doFetch(page, '/search'))).toBe(false);
     expect(isMocked(await doFetch(page, '/search?z=1'))).toBe(false);
   });
 
-  test('method filter: a specific method only, ANY matches all, init.method is case-insensitive', async ({ context, server }) => {
-    const page = await openWithRules({ context, server }, [
+  test('method filter: a specific method only, ANY matches all, init.method is case-insensitive', async ({ context, server, serviceWorker }) => {
+    const page = await openWithRules({ context, server, serviceWorker }, [
       rule({ url: '/only-post', method: 'POST' }),
       rule({ url: '/any', method: 'ANY' }),
     ]);
@@ -74,8 +75,8 @@ test.describe('engine: matching and basic mocking (fetch)', () => {
     expect(isMocked(await doFetch(page, '/any', { method: 'DELETE' }))).toBe(true);
   });
 
-  test('the first matching rule in list order wins', async ({ context, server }) => {
-    const page = await openWithRules({ context, server }, [
+  test('the first matching rule in list order wins', async ({ context, server, serviceWorker }) => {
+    const page = await openWithRules({ context, server, serviceWorker }, [
       rule({ url: '/api/users', response: { body: 'specific' } }),
       rule({ url: '/api/*', response: { body: 'generic' } }),
     ]);
@@ -83,27 +84,27 @@ test.describe('engine: matching and basic mocking (fetch)', () => {
     expect((await doFetch(page, '/api/other')).text).toBe('generic');
   });
 
-  test('a #fragment does not affect matching', async ({ context, server }) => {
-    const page = await openWithRules({ context, server }, [rule({ url: '/mocked' })]);
+  test('a #fragment does not affect matching', async ({ context, server, serviceWorker }) => {
+    const page = await openWithRules({ context, server, serviceWorker }, [rule({ url: '/mocked' })]);
     expect(isMocked(await doFetch(page, '/mocked#section'))).toBe(true);
   });
 
-  test('regex metacharacters in a pattern are literal', async ({ context, server }) => {
-    const page = await openWithRules({ context, server }, [rule({ url: '/a.b+c(1)' })]);
+  test('regex metacharacters in a pattern are literal', async ({ context, server, serviceWorker }) => {
+    const page = await openWithRules({ context, server, serviceWorker }, [rule({ url: '/a.b+c(1)' })]);
     expect(isMocked(await doFetch(page, '/a.b+c(1)'))).toBe(true);
     expect(isMocked(await doFetch(page, '/aXb+c(1)'))).toBe(false);
   });
 
-  test('works with a Request object and with a URL object', async ({ context, server }) => {
-    const page = await openWithRules({ context, server }, [rule({ url: '/mocked', response: { body: 'ok' } })]);
+  test('works with a Request object and with a URL object', async ({ context, server, serviceWorker }) => {
+    const page = await openWithRules({ context, server, serviceWorker }, [rule({ url: '/mocked', response: { body: 'ok' } })]);
     const viaRequest = await page.evaluate(() => fetch(new Request('/mocked')).then((r) => r.text()));
     const viaUrl = await page.evaluate(() => fetch(new URL('/mocked', location.href)).then((r) => r.text()));
     expect(viaRequest).toBe('ok');
     expect(viaUrl).toBe('ok');
   });
 
-  test('emits a MOCK_EVENT with the absolute URL, method and status', async ({ context, server }) => {
-    const page = await openWithRules({ context, server }, [
+  test('emits a MOCK_EVENT with the absolute URL, method and status', async ({ context, server, serviceWorker }) => {
+    const page = await openWithRules({ context, server, serviceWorker }, [
       rule({ id: 'ev1', url: '/mocked', method: 'POST', response: { status: 202 } }),
     ]);
     await page.evaluate(() => {
@@ -121,8 +122,8 @@ test.describe('engine: matching and basic mocking (fetch)', () => {
 });
 
 test.describe('engine: faithful fetch responses', () => {
-  test('status, statusText, ok, headers and body', async ({ context, server }) => {
-    const page = await openWithRules({ context, server }, [
+  test('status, statusText, ok, headers and body', async ({ context, server, serviceWorker }) => {
+    const page = await openWithRules({ context, server, serviceWorker }, [
       rule({ url: '/mocked', response: { status: 404, headers: [{ name: 'X-A', value: '1' }], body: 'nope' } }),
     ]);
     const out = await page.evaluate(async () => {
@@ -132,8 +133,8 @@ test.describe('engine: faithful fetch responses', () => {
     expect(out).toEqual({ status: 404, ok: false, statusText: 'Not Found', xa: '1', text: 'nope' });
   });
 
-  test('Content-Type: the user header wins, otherwise JSON bodies get application/json', async ({ context, server }) => {
-    const page = await openWithRules({ context, server }, [
+  test('Content-Type: the user header wins, otherwise JSON bodies get application/json', async ({ context, server, serviceWorker }) => {
+    const page = await openWithRules({ context, server, serviceWorker }, [
       rule({ url: '/json', response: { body: '{"a":1}' } }),
       rule({ url: '/text', response: { body: 'Created!' } }),
       rule({ url: '/override', response: { body: '{"a":1}', headers: [{ name: 'content-type', value: 'text/html' }] } }),
@@ -146,15 +147,15 @@ test.describe('engine: faithful fetch responses', () => {
     expect(await ct('/empty')).toBe('text/plain;charset=UTF-8');
   });
 
-  test('response.url is the absolute request URL (spec assumption 5)', async ({ context, server }) => {
-    const page = await openWithRules({ context, server }, [rule({ url: '/mocked' })]);
+  test('response.url is the absolute request URL (spec assumption 5)', async ({ context, server, serviceWorker }) => {
+    const page = await openWithRules({ context, server, serviceWorker }, [rule({ url: '/mocked' })]);
     const url = await page.evaluate(() => fetch('/mocked?x=1#frag').then((r) => r.url));
     expect(url).toBe(server.origin + '/mocked?x=1');
   });
 
   for (const status of [204, 205, 304]) {
-    test(`status ${status} is delivered without a body even if the rule has one`, async ({ context, server }) => {
-      const page = await openWithRules({ context, server }, [rule({ url: '/mocked', response: { status, body: 'ignored' } })]);
+    test(`status ${status} is delivered without a body even if the rule has one`, async ({ context, server, serviceWorker }) => {
+      const page = await openWithRules({ context, server, serviceWorker }, [rule({ url: '/mocked', response: { status, body: 'ignored' } })]);
       const out = await page.evaluate(async () => {
         const r = await fetch('/mocked');
         return { status: r.status, text: await r.text() };
@@ -163,8 +164,8 @@ test.describe('engine: faithful fetch responses', () => {
     });
   }
 
-  test('delay postpones the response', async ({ context, server }) => {
-    const page = await openWithRules({ context, server }, [rule({ url: '/mocked', response: { delay: 300 } })]);
+  test('delay postpones the response', async ({ context, server, serviceWorker }) => {
+    const page = await openWithRules({ context, server, serviceWorker }, [rule({ url: '/mocked', response: { delay: 300 } })]);
     const elapsed = await page.evaluate(async () => {
       const t0 = performance.now();
       await fetch('/mocked');
@@ -173,8 +174,8 @@ test.describe('engine: faithful fetch responses', () => {
     expect(elapsed).toBeGreaterThanOrEqual(250);
   });
 
-  test('a mocked fetch can be aborted during its delay, like a real one', async ({ context, server }) => {
-    const page = await openWithRules({ context, server }, [rule({ url: '/mocked', response: { delay: 1000 } })]);
+  test('a mocked fetch can be aborted during its delay, like a real one', async ({ context, server, serviceWorker }) => {
+    const page = await openWithRules({ context, server, serviceWorker }, [rule({ url: '/mocked', response: { delay: 1000 } })]);
     const out = await page.evaluate(async () => {
       const ac = new AbortController();
       setTimeout(() => ac.abort(), 50);
@@ -186,8 +187,8 @@ test.describe('engine: faithful fetch responses', () => {
     expect(out.elapsed).toBeLessThan(500);
   });
 
-  test('an already-aborted signal rejects immediately and the abort reason is preserved', async ({ context, server }) => {
-    const page = await openWithRules({ context, server }, [rule({ url: '/mocked' })]);
+  test('an already-aborted signal rejects immediately and the abort reason is preserved', async ({ context, server, serviceWorker }) => {
+    const page = await openWithRules({ context, server, serviceWorker }, [rule({ url: '/mocked' })]);
     const out = await page.evaluate(async () => {
       const a = await fetch('/mocked', { signal: AbortSignal.abort() }).then(() => 'resolved', (e) => e.name);
       const ac = new AbortController();
@@ -198,13 +199,13 @@ test.describe('engine: faithful fetch responses', () => {
     expect(out).toEqual(['AbortError', 'boom']);
   });
 
-  test('a rule the browser would reject (status 700) is skipped and the request passes through', async ({ context, server }) => {
-    const page = await openWithRules({ context, server }, [rule({ url: '/bad', response: { status: 700 } })]);
+  test('a rule the browser would reject (status 700) is skipped and the request passes through', async ({ context, server, serviceWorker }) => {
+    const page = await openWithRules({ context, server, serviceWorker }, [rule({ url: '/bad', response: { status: 700 } })]);
     expect(isMocked(await doFetch(page, '/bad'))).toBe(false);
   });
 
-  test('non-matching requests reach the server untouched (method, body, Request objects)', async ({ context, server }) => {
-    const page = await openWithRules({ context, server }, [rule({ url: '/mocked' })]);
+  test('non-matching requests reach the server untouched (method, body, Request objects)', async ({ context, server, serviceWorker }) => {
+    const page = await openWithRules({ context, server, serviceWorker }, [rule({ url: '/mocked' })]);
     const statuses = await page.evaluate(async () => {
       const a = await fetch('/api/upload', { method: 'POST', body: 'payload', headers: { 'x-t': '1' } });
       const b = await fetch(new Request('/api/req-body', { method: 'PUT', body: 'abc' }));
@@ -214,8 +215,8 @@ test.describe('engine: faithful fetch responses', () => {
     expect(server.requests).toEqual(expect.arrayContaining(['POST /api/upload', 'PUT /api/req-body']));
   });
 
-  test('the patched fetch keeps the native name and length', async ({ context, server }) => {
-    const page = await openWithRules({ context, server }, []);
+  test('the patched fetch keeps the native name and length', async ({ context, server, serviceWorker }) => {
+    const page = await openWithRules({ context, server, serviceWorker }, []);
     expect(await page.evaluate(() => [fetch.name, fetch.length])).toEqual(['fetch', 1]);
   });
 
@@ -229,9 +230,9 @@ test.describe('engine: faithful fetch responses', () => {
     { status: 503, ct: 'text/plain', body: '' },
   ];
 
-  test('conformance: a mocked response looks like the real one for common cases', async ({ context, server }) => {
+  test('conformance: a mocked response looks like the real one for common cases', async ({ context, server, serviceWorker }) => {
     const page = await openWithRules(
-      { context, server },
+      { context, server, serviceWorker },
       CASES.map((c, i) =>
         rule({
           url: `/mocked/${i}`,

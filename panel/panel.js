@@ -2,10 +2,14 @@ import { h, clear, logoSvg, toggleSwitch } from '../shared/dom.js';
 import { readAll, subscribe, send } from '../shared/store.js';
 import { methodLabel, defaultName, newRule } from '../shared/rule.js';
 import { ui, onUiChange, uiChanged } from './ui.js';
+import { mountEditor, unmountEditor } from './editor.js';
 
 let data = null; // last read of storage
 let seq = 0;
 let focusSelected = false; // restore keyboard focus after a re-render caused by arrow keys
+let mountedId = null; // rule currently open in the editor
+const latest = (id) => ui.drafts.get(id) || (data && data.state.rules.find((r) => r.id === id)) || null;
+const editorApi = { latest, refresh: () => update() };
 
 function resolveTabId() {
   const fromUrl = new URLSearchParams(location.search).get('tabId'); // test hook
@@ -115,8 +119,14 @@ function render() {
     if (row) row.focus();
   }
 
-  if (!ui.selectedId && !isEmpty) {
-    clear(els.editorSlot).append(h('div', { class: 'placeholder' }, 'Select a rule to edit.'));
+  const selected = all.find((r) => r.id === ui.selectedId) || null;
+  if (!selected) {
+    unmountEditor();
+    mountedId = null;
+    if (!isEmpty) clear(els.editorSlot).append(h('div', { class: 'placeholder' }, 'Select a rule to edit.'));
+  } else if (ui.selectedId !== mountedId) {
+    mountedId = ui.selectedId;
+    mountEditor(els.editorSlot, selected, editorApi);
   }
 }
 

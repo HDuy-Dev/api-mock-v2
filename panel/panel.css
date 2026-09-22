@@ -26,3 +26,33 @@ html, body { height: 100%; overflow: hidden; }
 .empty p { color: var(--mu); max-width: 440px; }
 .hint { max-width: 470px; padding: 8px 12px; border: 1px solid color-mix(in srgb, var(--ac) 30%, transparent); background: color-mix(in srgb, var(--ac) 8%, transparent); border-radius: var(--r); font-size: 12px; }
 .btn.big { height: 32px; padding: 0 18px; font-size: 12px; }
+
+.editor-slot { display: flex; flex-direction: column; }
+.editor { flex: 1; display: flex; flex-direction: column; gap: 9px; padding: 10px 12px; min-height: 0; }
+.ed-top { display: flex; align-items: center; gap: 10px; }
+.saved { font-size: 10.5px; color: var(--ok); }
+.saved.mu { color: var(--mu); }
+.saved.bad { color: var(--err-text); }
+.line { display: flex; gap: 8px; align-items: flex-start; }
+
+.editor input, .editor select, .editor textarea { background: var(--input); color: var(--tx); border: 1px solid var(--bd); border-radius: var(--r); font-size: 12px; }
+.editor input, .editor select { height: 26px; padding: 0 8px; }
+.editor textarea { padding: 6px 8px; font-size: 11.5px; line-height: 1.5; resize: vertical; background: var(--code); white-space: pre; }
+.editor input.name { font-size: 13px; font-weight: 600; background: transparent; border-color: transparent; padding: 2px 6px; margin-left: -6px; min-width: 120px; }
+.editor input.name:hover, .editor input.name:focus { border-color: var(--bd); background: var(--input); }
+.editor .method { width: 92px; font-weight: 700; color: var(--c, var(--tx)); }
+.editor .method.GET { --c: var(--get); } .editor .method.POST { --c: var(--post); } .editor .method.PUT { --c: var(--put); }
+.editor .method.PATCH { --c: var(--patch); } .editor .method.DELETE { --c: var(--delete); } .editor .method.HEAD { --c: var(--head); }
+.editor .method.OPTIONS { --c: var(--options); } .editor .method.ANY { --c: var(--any); }
+.editor .url { width: 100%; }
+.editor .status, .editor .delay { width: 76px; }
+.editor .err { border-color: var(--err); box-shadow: 0 0 0 1px color-mix(in srgb, var(--err) 40%, transparent); }
+
+.fld { display: flex; flex-direction: column; gap: 3px; font-size: 10.5px; color: var(--mu); text-transform: uppercase; letter-spacing: 0.04em; }
+.fld.grow { flex: 1; min-width: 0; min-height: 0; }
+.fmsg { color: var(--err-text); font-size: 10.5px; text-transform: none; letter-spacing: 0; }
+.fmsg:empty { display: none; }
+.lbl-row { display: flex; align-items: center; gap: 8px; }
+.note { font-size: 10.5px; color: var(--mu); text-transform: none; letter-spacing: 0; }
+.note.ok { color: var(--ok); }
+.editor .body { flex: 1; min-height: 120px; }

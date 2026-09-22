@@ -69,3 +69,27 @@ html, body { height: 100%; overflow: hidden; }
 .dialog { width: 320px; padding: 16px; background: var(--surface); border: 1px solid var(--bd); border-radius: 10px; }
 .dialog p { margin-bottom: 14px; }
 .dialog .actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+.log { flex: none; height: 118px; display: flex; flex-direction: column; border-top: 1px solid var(--bd); background: var(--bg); }
+.log-h { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px; flex: none; background: var(--surface); border-bottom: 1px solid var(--bd-soft); }
+.chip { font-size: 10.5px; padding: 2px 9px; border-radius: 9px; border: 1px solid var(--bd); background: transparent; color: var(--mu); }
+.chip[aria-pressed='true'] { background: var(--surface); color: var(--tx); border-color: var(--ac); }
+.log-list { flex: 1; overflow: auto; }
+
+.lr { display: flex; align-items: center; gap: 8px; min-height: 28px; padding: 4px 10px; border-bottom: 1px solid var(--bd-soft); }
+.lr.none { justify-content: center; min-height: 44px; color: var(--mu); }
+.lr .t { flex: none; color: var(--mu); font-size: 10.5px; }
+.lr .u { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lr .mth { min-width: 36px; padding: 2px 0; }
+.lr .why { color: var(--mu); font-size: 11px; }
+.lr.warn { color: var(--warn); }
+.lr.fail { color: var(--err-text); }
+.ic { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; font-weight: 700; font-size: 10px; }
+.lr.warn .ic { background: color-mix(in srgb, var(--warn) 20%, transparent); }
+.lr.fail .ic { background: color-mix(in srgb, var(--err) 20%, transparent); }
+
+.st { font-family: ui-monospace, Menlo, monospace; font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 9px; }
+.st.good { color: var(--ok); background: color-mix(in srgb, var(--ok) 15%, transparent); }
+.st.info { color: var(--put); background: color-mix(in srgb, var(--put) 15%, transparent); }
+.st.warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 15%, transparent); }
+.st.bad { color: var(--err-text); background: color-mix(in srgb, var(--err) 15%, transparent); }

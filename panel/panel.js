@@ -3,6 +3,7 @@ import { readAll, subscribe, send } from '../shared/store.js';
 import { methodLabel, defaultName, newRule } from '../shared/rule.js';
 import { ui, onUiChange, uiChanged } from './ui.js';
 import { mountEditor, unmountEditor } from './editor.js';
+import { renderLog } from './log.js';
 
 let data = null; // last read of storage
 let seq = 0;
@@ -129,6 +130,8 @@ function render() {
     mountedId = ui.selectedId;
     mountEditor(els.editorSlot, selected, editorApi);
   }
+
+  renderLog(els.logSlot, { log: data.log, tabId: ui.tabId });
 }
 
 // "Latest read wins": a slow, older read never overwrites a newer render.

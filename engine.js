@@ -11,7 +11,7 @@
 
   const NS = '__API_MOCK__/';
   const nativeFetch = window.fetch;
-  const state = { rules: [], rulesLoaded: false };
+  const state = { rules: [], rulesLoaded: false, gaveUp: false };
 
   // ── Reporting ────────────────────────────────────────────────────────────
   function emit(kind, data) {
@@ -21,6 +21,33 @@
       // Reporting must never break the page.
     }
   }
+
+  function reportError(error, ruleId) {
+    emit('ENGINE_ERROR', { message: String((error && error.message) || error).slice(0, 300), ruleId: ruleId || null });
+  }
+
+  // ── Startup gate ─────────────────────────────────────────────────────────
+  // Until the first RULES arrive, requests wait (at most GATE_MS); then the engine fails open.
+  const GATE_MS = 1000;
+  let openGate;
+  const gate = new Promise((resolve) => {
+    openGate = resolve;
+  });
+  let unavailableReported = false;
+  const gateOpen = () => state.rulesLoaded || state.gaveUp;
+
+  function reportUnavailable() {
+    if (unavailableReported) return;
+    unavailableReported = true;
+    emit('RULES_UNAVAILABLE');
+  }
+
+  const gateTimer = setTimeout(() => {
+    if (state.rulesLoaded) return;
+    state.gaveUp = true;
+    reportUnavailable();
+    openGate();
+  }, GATE_MS);
 
   // ── Rules: normalize, compile, match ─────────────────────────────────────
   function normalizeUrl(input) {
@@ -35,7 +62,12 @@
   }
 
   function requestInfo(rawUrl, method) {
-    const u = normalizeUrl(rawUrl);
+    let u;
+    try {
+      u = normalizeUrl(rawUrl);
+    } catch (_) {
+      return null; // an invalid URL is reported by the browser itself
+    }
     return {
       method: String(method || 'GET').toUpperCase(),
       href: u.href,
@@ -117,21 +149,30 @@
     for (const r of Array.isArray(rawRules) ? rawRules : []) {
       try {
         compiled.push(compileRule(r));
-      } catch (_) {
-        // A rule that cannot be compiled is skipped (Task 6 adds ENGINE_ERROR reporting).
+      } catch (e) {
+        reportError(e, r && r.id);
       }
     }
     state.rules = compiled;
     state.rulesLoaded = true;
+    clearTimeout(gateTimer);
+    openGate();
   }
 
   // ── Intake: RULES pushed by the bridge ───────────────────────────────────
-  window.addEventListener('message', (ev) => {
-    if (ev.source !== window) return;
-    const d = ev.data;
-    if (!d || d.type !== NS + 'RULES') return;
-    loadRules(d.rules);
-  });
+  // Registered first, in the capture phase, and it stops propagation: page scripts registered
+  // later cannot observe the rules.
+  window.addEventListener(
+    'message',
+    (ev) => {
+      if (ev.source !== window) return;
+      const d = ev.data;
+      if (!d || d.type !== NS + 'RULES') return;
+      ev.stopImmediatePropagation();
+      loadRules(d.rules);
+    },
+    true,
+  );
 
   // ── fetch ────────────────────────────────────────────────────────────────
   function fetchInfo(input, init) {
@@ -139,14 +180,15 @@
     const rawUrl = isRequest ? input.url : String(input);
     const method = (init && init.method) || (isRequest ? input.method : 'GET');
     const signal = (init && init.signal) || (isRequest ? input.signal : undefined);
-    return { ...requestInfo(rawUrl, method), signal };
+    const info = requestInfo(rawUrl, method);
+    return info && { ...info, signal };
   }
 
   function abortReason(signal) {
     return signal.reason !== undefined ? signal.reason : new DOMException('The user aborted a request.', 'AbortError');
   }
 
-  function mockFetch(rule, info) {
+  function mockFetch(rule, info, fallback) {
     emit('MOCK_EVENT', { ruleId: rule.id, url: info.href, method: info.method, status: rule.response.status });
     const { signal } = info;
     return new Promise((resolve, reject) => {
@@ -162,27 +204,37 @@
       if (signal) signal.addEventListener('abort', onAbort, { once: true });
       timer = setTimeout(() => {
         if (signal) signal.removeEventListener('abort', onAbort);
-        resolve(buildResponse(rule.response, info.href));
+        try {
+          resolve(buildResponse(rule.response, info.href));
+        } catch (e) {
+          reportError(e, rule.id);
+          resolve(fallback());
+        }
       }, rule.response.delay);
     });
   }
 
   // Declared as an object method so `fetch.name === 'fetch'` and `fetch.length === 1`, like the native one.
-  window.fetch = {
+  const patchedFetch = {
     fetch: function fetch(input) {
-      const init = arguments[1];
+      const self = this;
+      const args = arguments;
+      if (!gateOpen()) return gate.then(() => Reflect.apply(patchedFetch, self, args));
+      const fallback = () => Reflect.apply(nativeFetch, self, args);
       let rule = null;
       let info = null;
       try {
-        info = fetchInfo(input, init);
-        rule = matchRequest(info);
-      } catch (_) {
-        rule = null;
+        info = fetchInfo(input, args[1]);
+        rule = info ? matchRequest(info) : null;
+      } catch (e) {
+        reportError(e);
+        return fallback();
       }
-      if (!rule) return Reflect.apply(nativeFetch, this, arguments);
-      return mockFetch(rule, info);
+      if (!rule) return fallback();
+      return mockFetch(rule, info, fallback);
     },
   }.fetch;
+  window.fetch = patchedFetch;
 
   // ── XMLHttpRequest ───────────────────────────────────────────────────────
   // Patched on the prototype so identity (instanceof, constants, prototype chain) stays native.
@@ -274,6 +326,24 @@
     m.readyState = 0;
   }
 
+  // An XHR aborted while it was still waiting for the first RULES.
+  function abortDeferred(xhr) {
+    const m = {
+      rule: { response: { status: 0, statusText: '', body: '', headers: [] } },
+      url: '',
+      headers: new Map(),
+      responseType: xhr.responseType,
+      readyState: 1,
+      aborted: false,
+      done: false,
+      timer: 0,
+      cache: undefined,
+      size: 0,
+    };
+    xhrMocks.set(xhr, m);
+    abortMock(xhr, m);
+  }
+
   function mockResponse(m) {
     const text = m.rule.response.body ?? '';
     const isText = m.responseType === '' || m.responseType === 'text';
@@ -337,6 +407,8 @@
           method: String(method).toUpperCase(),
           rawUrl: String(url),
           isAsync: arguments.length < 3 || arguments[2] === undefined || !!arguments[2],
+          deferred: false,
+          cancelled: false,
         });
       } catch (_) {
         // Fall through to the native open().
@@ -345,24 +417,56 @@
     },
     send() {
       const req = xhrRequests.get(this);
+      if (req && req.cancelled) return undefined; // aborted while waiting for the first RULES
+      if (!gateOpen()) {
+        if (!req || !req.isAsync) {
+          reportUnavailable(); // a synchronous XHR cannot wait
+          return Reflect.apply(nativeXhr.send, this, arguments);
+        }
+        req.deferred = true;
+        const self = this;
+        const args = arguments;
+        gate.then(() => {
+          req.deferred = false;
+          try {
+            Reflect.apply(patchedXhr.send, self, args);
+          } catch (_) {
+            // The page re-opened or aborted the request in the meantime.
+          }
+        });
+        return undefined;
+      }
       let rule = null;
       let info = null;
       try {
         if (req) {
           info = requestInfo(req.rawUrl, req.method);
-          rule = matchRequest(info);
+          rule = info ? matchRequest(info) : null;
         }
-      } catch (_) {
-        rule = null;
+      } catch (e) {
+        reportError(e);
       }
       if (!rule) return Reflect.apply(nativeXhr.send, this, arguments);
       if (xhrMocks.has(this)) {
         throw new DOMException("Failed to execute 'send' on 'XMLHttpRequest': The object's state must be OPENED.", 'InvalidStateError');
       }
-      startMock(this, rule, info, req.isAsync);
+      try {
+        startMock(this, rule, info, req.isAsync);
+      } catch (e) {
+        xhrMocks.delete(this);
+        reportError(e, rule.id);
+        return Reflect.apply(nativeXhr.send, this, arguments);
+      }
       return undefined;
     },
     abort() {
+      const req = xhrRequests.get(this);
+      if (req && req.deferred) {
+        req.deferred = false;
+        req.cancelled = true;
+        abortDeferred(this);
+        return undefined;
+      }
       const m = xhrMocks.get(this);
       if (!m) return Reflect.apply(nativeXhr.abort, this, arguments);
       abortMock(this, m);

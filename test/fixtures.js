@@ -38,6 +38,16 @@ const test = base.extend({
   extensionId: async ({ serviceWorker }, use) => {
     await use(new URL(serviceWorker.url()).host);
   },
+
+  // A plain Chromium page (no extension) with only engine.js injected at document start.
+  // No bridge: the test controls exactly when RULES arrive.
+  enginePage: async ({ browser }, use) => {
+    const context = await browser.newContext();
+    await context.addInitScript({ path: path.join(EXTENSION_PATH, 'engine.js') });
+    const page = await context.newPage();
+    await use(page);
+    await context.close();
+  },
 });
 
 module.exports = { test, expect };

@@ -1,5 +1,5 @@
 const { test, expect } = require('./fixtures');
-const { openExtensionPage } = require('./helpers');
+const { openExtensionPage, rule, pushRules } = require('./helpers');
 
 test('extension loads with a running service worker and the minimal manifest', async ({ extensionId, serviceWorker }) => {
   expect(extensionId).toMatch(/^[a-p]{32}$/);
@@ -13,7 +13,8 @@ test('extension loads with a running service worker and the minimal manifest', a
 test('engine content script runs in the MAIN world of a plain http page (spec assumptions 1 and 7)', async ({ context, server }) => {
   const page = await context.newPage();
   await page.goto(server.origin + '/');
-  expect(await page.evaluate(() => window.__ENGINE_STUB__)).toBe(true);
+  await pushRules(page, [rule({ url: '/mocked' })]);
+  expect(await page.evaluate(() => fetch('/mocked').then((r) => r.text()))).toBe('{"mocked":true}');
 });
 
 test('bridge content script (ISOLATED world) can message extension pages', async ({ context, server, extensionId }) => {

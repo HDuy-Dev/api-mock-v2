@@ -183,4 +183,210 @@
       return mockFetch(rule, info);
     },
   }.fetch;
+
+  // ── XMLHttpRequest ───────────────────────────────────────────────────────
+  // Patched on the prototype so identity (instanceof, constants, prototype chain) stays native.
+  // A matching request still calls native open() but never native send().
+  const xhrProto = XMLHttpRequest.prototype;
+  const nativeXhr = {
+    open: xhrProto.open,
+    send: xhrProto.send,
+    abort: xhrProto.abort,
+    getResponseHeader: xhrProto.getResponseHeader,
+    getAllResponseHeaders: xhrProto.getAllResponseHeaders,
+  };
+  const nativeGetters = {};
+  for (const key of ['readyState', 'status', 'statusText', 'response', 'responseText', 'responseURL']) {
+    nativeGetters[key] = Object.getOwnPropertyDescriptor(xhrProto, key).get;
+  }
+  const xhrRequests = new WeakMap(); // xhr -> { method, rawUrl, isAsync }
+  const xhrMocks = new WeakMap(); // xhr -> mock state (in progress or finished)
+
+  function fire(xhr, type, loaded = 0, total = 0) {
+    try {
+      const event =
+        type === 'readystatechange'
+          ? new Event(type)
+          : new ProgressEvent(type, { lengthComputable: total > 0, loaded, total });
+      xhr.dispatchEvent(event);
+    } catch (_) {
+      // A throwing page handler must not break the engine.
+    }
+  }
+
+  function startMock(xhr, rule, info, isAsync) {
+    const c = rule.response;
+    const headers = new Map();
+    for (const [name, value] of c.headers) {
+      const key = name.toLowerCase();
+      headers.set(key, headers.has(key) ? headers.get(key) + ', ' + value : value);
+    }
+    const m = {
+      rule,
+      url: info.href,
+      headers,
+      responseType: xhr.responseType,
+      readyState: 1,
+      aborted: false,
+      done: false,
+      timer: 0,
+      cache: undefined,
+      size: new TextEncoder().encode(c.body ?? '').length,
+    };
+    xhrMocks.set(xhr, m);
+    emit('MOCK_EVENT', { ruleId: rule.id, url: info.href, method: info.method, status: c.status });
+    if (!isAsync) {
+      m.readyState = 4;
+      m.done = true;
+      return;
+    }
+    fire(xhr, 'loadstart');
+    m.timer = setTimeout(() => advance(xhr, m), c.delay);
+  }
+
+  function advance(xhr, m) {
+    m.readyState = 2;
+    fire(xhr, 'readystatechange');
+    m.readyState = 3;
+    fire(xhr, 'readystatechange');
+    fire(xhr, 'progress', m.size, m.size);
+    m.readyState = 4;
+    m.done = true;
+    fire(xhr, 'readystatechange');
+    fire(xhr, 'load', m.size, m.size);
+    fire(xhr, 'loadend', m.size, m.size);
+  }
+
+  function abortMock(xhr, m) {
+    if (m.aborted) return;
+    clearTimeout(m.timer);
+    if (m.done) {
+      // Aborting a finished request just resets it.
+      m.aborted = true;
+      m.readyState = 0;
+      return;
+    }
+    m.aborted = true;
+    m.readyState = 4;
+    fire(xhr, 'readystatechange');
+    fire(xhr, 'abort');
+    fire(xhr, 'loadend');
+    m.readyState = 0;
+  }
+
+  function mockResponse(m) {
+    const text = m.rule.response.body ?? '';
+    const isText = m.responseType === '' || m.responseType === 'text';
+    if (m.readyState !== 4 || m.aborted) return isText ? '' : null;
+    if (m.cache === undefined) {
+      if (isText) {
+        m.cache = text;
+      } else if (m.responseType === 'json') {
+        try {
+          m.cache = JSON.parse(text);
+        } catch (_) {
+          m.cache = null;
+        }
+      } else if (m.responseType === 'arraybuffer') {
+        m.cache = new TextEncoder().encode(text).buffer;
+      } else if (m.responseType === 'blob') {
+        m.cache = new Blob([text], { type: m.headers.get('content-type') || '' });
+      } else {
+        m.cache = null; // 'document' is not supported
+      }
+    }
+    return m.cache;
+  }
+
+  const headersVisible = (m) => m.readyState >= 2 && !m.aborted;
+
+  function defineGetter(key, mocked) {
+    Object.defineProperty(xhrProto, key, {
+      configurable: true,
+      enumerable: true,
+      get() {
+        const m = xhrMocks.get(this);
+        return m ? mocked(m) : nativeGetters[key].call(this);
+      },
+    });
+  }
+  defineGetter('readyState', (m) => m.readyState);
+  defineGetter('status', (m) => (headersVisible(m) ? m.rule.response.status : 0));
+  defineGetter('statusText', (m) => (headersVisible(m) ? m.rule.response.statusText : ''));
+  defineGetter('responseURL', (m) => (headersVisible(m) ? m.url : ''));
+  defineGetter('response', (m) => mockResponse(m));
+  defineGetter('responseText', (m) => {
+    if (m.responseType !== '' && m.responseType !== 'text') {
+      throw new DOMException(
+        `Failed to read the 'responseText' property from 'XMLHttpRequest': The value is only accessible if the object's 'responseType' is '' or 'text' (was '${m.responseType}').`,
+        'InvalidStateError',
+      );
+    }
+    return m.readyState === 4 && !m.aborted ? (m.rule.response.body ?? '') : '';
+  });
+
+  const patchedXhr = {
+    open(method, url) {
+      try {
+        const previous = xhrMocks.get(this);
+        if (previous) {
+          clearTimeout(previous.timer);
+          xhrMocks.delete(this);
+        }
+        xhrRequests.set(this, {
+          method: String(method).toUpperCase(),
+          rawUrl: String(url),
+          isAsync: arguments.length < 3 || arguments[2] === undefined || !!arguments[2],
+        });
+      } catch (_) {
+        // Fall through to the native open().
+      }
+      return Reflect.apply(nativeXhr.open, this, arguments);
+    },
+    send() {
+      const req = xhrRequests.get(this);
+      let rule = null;
+      let info = null;
+      try {
+        if (req) {
+          info = requestInfo(req.rawUrl, req.method);
+          rule = matchRequest(info);
+        }
+      } catch (_) {
+        rule = null;
+      }
+      if (!rule) return Reflect.apply(nativeXhr.send, this, arguments);
+      if (xhrMocks.has(this)) {
+        throw new DOMException("Failed to execute 'send' on 'XMLHttpRequest': The object's state must be OPENED.", 'InvalidStateError');
+      }
+      startMock(this, rule, info, req.isAsync);
+      return undefined;
+    },
+    abort() {
+      const m = xhrMocks.get(this);
+      if (!m) return Reflect.apply(nativeXhr.abort, this, arguments);
+      abortMock(this, m);
+      return undefined;
+    },
+    getResponseHeader(name) {
+      const m = xhrMocks.get(this);
+      if (!m) return Reflect.apply(nativeXhr.getResponseHeader, this, arguments);
+      if (!headersVisible(m)) return null;
+      const value = m.headers.get(String(name).toLowerCase());
+      return value === undefined ? null : value;
+    },
+    getAllResponseHeaders() {
+      const m = xhrMocks.get(this);
+      if (!m) return Reflect.apply(nativeXhr.getAllResponseHeaders, this, arguments);
+      if (!headersVisible(m)) return '';
+      let out = '';
+      for (const [key, value] of m.headers) out += `${key}: ${value}\r\n`;
+      return out;
+    },
+  };
+  xhrProto.open = patchedXhr.open;
+  xhrProto.send = patchedXhr.send;
+  xhrProto.abort = patchedXhr.abort;
+  xhrProto.getResponseHeader = patchedXhr.getResponseHeader;
+  xhrProto.getAllResponseHeaders = patchedXhr.getAllResponseHeaders;
 })();

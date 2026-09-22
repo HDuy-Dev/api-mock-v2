@@ -40,7 +40,7 @@ function onRowKey(e) {
       focusSelected = true;
       select(next.dataset.id);
     }
-  } else if (e.key === 'Enter' || e.key === ' ') {
+  } else if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) {
     e.preventDefault();
     select(e.currentTarget.dataset.id);
   }

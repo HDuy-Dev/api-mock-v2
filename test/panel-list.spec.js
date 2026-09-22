@@ -61,6 +61,41 @@ test.describe('panel: rules list', () => {
     await expect(panel.locator('.row').nth(0)).toHaveClass(/\bsel\b/); // still the first rule
   });
 
+  test('Enter or Space on the row itself selects it (focus not on a nested control)', async ({ context, serviceWorker, extensionId }) => {
+    await setState(serviceWorker, { rules: RULES() });
+    const panel = await openPanel(context, extensionId);
+
+    await panel.locator('.row').nth(1).focus();
+    await panel.keyboard.press('Enter');
+    await expect(panel.locator('.row').nth(1)).toHaveClass(/\bsel\b/);
+
+    await panel.locator('.row').nth(2).focus();
+    await panel.keyboard.press(' ');
+    await expect(panel.locator('.row').nth(2)).toHaveClass(/\bsel\b/);
+  });
+
+  test('Space or Enter on a rule switch toggles it, even though the keydown bubbles through the row', async ({ context, serviceWorker, extensionId }) => {
+    await setState(serviceWorker, { rules: RULES() });
+    const panel = await openPanel(context, extensionId);
+    const row = panel.locator('.row').nth(1); // 'Login', enabled: true, not selected (first row is)
+    const sw = row.locator('.tg');
+    await expect(sw).toHaveAttribute('aria-checked', 'true');
+
+    await sw.focus();
+    await panel.keyboard.press(' ');
+    await expect(sw).toHaveAttribute('aria-checked', 'false');
+    await expect(row).toHaveClass(/\boff\b/);
+    expect((await stored(serviceWorker)).rules.find((r) => r.id === 'b').enabled).toBe(false);
+    await expect(panel.locator('.row').nth(0)).toHaveClass(/\bsel\b/); // selection unchanged: still the first row
+    await expect(row).not.toHaveClass(/\bsel\b/);
+
+    await sw.focus();
+    await panel.keyboard.press('Enter');
+    await expect(sw).toHaveAttribute('aria-checked', 'true');
+    expect((await stored(serviceWorker)).rules.find((r) => r.id === 'b').enabled).toBe(true);
+    await expect(panel.locator('.row').nth(0)).toHaveClass(/\bsel\b/); // still unchanged
+  });
+
   test('the global switch turns mocking off and on', async ({ context, serviceWorker, extensionId }) => {
     await setState(serviceWorker, { rules: RULES() });
     const panel = await openPanel(context, extensionId);

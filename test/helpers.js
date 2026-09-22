@@ -29,7 +29,7 @@ async function pushRules(page, rules) {
   }, payload);
 }
 
-async function openExtensionPage(context, extensionId, pagePath = 'popup/popup.html') {
+async function openExtensionPage(context, extensionId, pagePath = 'devtools.html') {
   const page = await context.newPage();
   await page.goto(`chrome-extension://${extensionId}/${pagePath}`);
   return page;

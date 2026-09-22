@@ -43,6 +43,11 @@ export function isJson(text) {
   }
 }
 
+const SHORT_METHOD = { DELETE: 'DEL', OPTIONS: 'OPT' };
+export function methodLabel(method) {
+  return SHORT_METHOD[method] || method;
+}
+
 // ── Headers ("Key: Value" lines ⇄ [{ name, value }]) ───────────────────────
 export function parseHeaders(text) {
   const headers = [];

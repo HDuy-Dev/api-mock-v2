@@ -35,4 +35,23 @@ async function openExtensionPage(context, extensionId, pagePath = 'popup/popup.h
   return page;
 }
 
-module.exports = { rule, setState, pushRules, openExtensionPage };
+/** The id of the (single) tab the service worker keeps counters for. */
+async function tabIdOf(serviceWorker) {
+  const s = await serviceWorker.evaluate(() => chrome.storage.session.get(null));
+  const key = Object.keys(s).find((k) => k.startsWith('tab:'));
+  return key ? Number(key.slice(4)) : null;
+}
+
+/** Opens a real page (with the bridge) and waits until the service worker has registered its tab. */
+async function openPageWithTab(context, server, serviceWorker, path = '/') {
+  const page = await context.newPage();
+  await page.goto(server.origin + path);
+  let tabId = null;
+  for (let i = 0; i < 50 && tabId === null; i++) {
+    tabId = await tabIdOf(serviceWorker);
+    if (tabId === null) await page.waitForTimeout(100);
+  }
+  return { page, tabId };
+}
+
+module.exports = { rule, setState, pushRules, openExtensionPage, tabIdOf, openPageWithTab };

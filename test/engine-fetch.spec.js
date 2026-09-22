@@ -119,3 +119,153 @@ test.describe('engine: matching and basic mocking (fetch)', () => {
     expect(typeof ev.ts).toBe('number');
   });
 });
+
+test.describe('engine: faithful fetch responses', () => {
+  test('status, statusText, ok, headers and body', async ({ context, server }) => {
+    const page = await openWithRules({ context, server }, [
+      rule({ url: '/mocked', response: { status: 404, headers: [{ name: 'X-A', value: '1' }], body: 'nope' } }),
+    ]);
+    const out = await page.evaluate(async () => {
+      const r = await fetch('/mocked');
+      return { status: r.status, ok: r.ok, statusText: r.statusText, xa: r.headers.get('x-a'), text: await r.text() };
+    });
+    expect(out).toEqual({ status: 404, ok: false, statusText: 'Not Found', xa: '1', text: 'nope' });
+  });
+
+  test('Content-Type: the user header wins, otherwise JSON bodies get application/json', async ({ context, server }) => {
+    const page = await openWithRules({ context, server }, [
+      rule({ url: '/json', response: { body: '{"a":1}' } }),
+      rule({ url: '/text', response: { body: 'Created!' } }),
+      rule({ url: '/override', response: { body: '{"a":1}', headers: [{ name: 'content-type', value: 'text/html' }] } }),
+      rule({ url: '/empty', response: { body: '' } }),
+    ]);
+    const ct = (path) => page.evaluate((p) => fetch(p).then((r) => r.headers.get('content-type')), path);
+    expect(await ct('/json')).toBe('application/json');
+    expect(await ct('/text')).toBe('text/plain;charset=UTF-8');
+    expect(await ct('/override')).toBe('text/html');
+    expect(await ct('/empty')).toBe('text/plain;charset=UTF-8');
+  });
+
+  test('response.url is the absolute request URL (spec assumption 5)', async ({ context, server }) => {
+    const page = await openWithRules({ context, server }, [rule({ url: '/mocked' })]);
+    const url = await page.evaluate(() => fetch('/mocked?x=1#frag').then((r) => r.url));
+    expect(url).toBe(server.origin + '/mocked?x=1');
+  });
+
+  for (const status of [204, 205, 304]) {
+    test(`status ${status} is delivered without a body even if the rule has one`, async ({ context, server }) => {
+      const page = await openWithRules({ context, server }, [rule({ url: '/mocked', response: { status, body: 'ignored' } })]);
+      const out = await page.evaluate(async () => {
+        const r = await fetch('/mocked');
+        return { status: r.status, text: await r.text() };
+      });
+      expect(out).toEqual({ status, text: '' });
+    });
+  }
+
+  test('delay postpones the response', async ({ context, server }) => {
+    const page = await openWithRules({ context, server }, [rule({ url: '/mocked', response: { delay: 300 } })]);
+    const elapsed = await page.evaluate(async () => {
+      const t0 = performance.now();
+      await fetch('/mocked');
+      return performance.now() - t0;
+    });
+    expect(elapsed).toBeGreaterThanOrEqual(250);
+  });
+
+  test('a mocked fetch can be aborted during its delay, like a real one', async ({ context, server }) => {
+    const page = await openWithRules({ context, server }, [rule({ url: '/mocked', response: { delay: 1000 } })]);
+    const out = await page.evaluate(async () => {
+      const ac = new AbortController();
+      setTimeout(() => ac.abort(), 50);
+      const t0 = performance.now();
+      const name = await fetch('/mocked', { signal: ac.signal }).then(() => 'resolved', (e) => e.name);
+      return { name, elapsed: performance.now() - t0 };
+    });
+    expect(out.name).toBe('AbortError');
+    expect(out.elapsed).toBeLessThan(500);
+  });
+
+  test('an already-aborted signal rejects immediately and the abort reason is preserved', async ({ context, server }) => {
+    const page = await openWithRules({ context, server }, [rule({ url: '/mocked' })]);
+    const out = await page.evaluate(async () => {
+      const a = await fetch('/mocked', { signal: AbortSignal.abort() }).then(() => 'resolved', (e) => e.name);
+      const ac = new AbortController();
+      ac.abort('boom');
+      const b = await fetch(new Request('/mocked', { signal: ac.signal })).then(() => 'resolved', (e) => e);
+      return [a, b];
+    });
+    expect(out).toEqual(['AbortError', 'boom']);
+  });
+
+  test('a rule the browser would reject (status 700) is skipped and the request passes through', async ({ context, server }) => {
+    const page = await openWithRules({ context, server }, [rule({ url: '/bad', response: { status: 700 } })]);
+    expect(isMocked(await doFetch(page, '/bad'))).toBe(false);
+  });
+
+  test('non-matching requests reach the server untouched (method, body, Request objects)', async ({ context, server }) => {
+    const page = await openWithRules({ context, server }, [rule({ url: '/mocked' })]);
+    const statuses = await page.evaluate(async () => {
+      const a = await fetch('/api/upload', { method: 'POST', body: 'payload', headers: { 'x-t': '1' } });
+      const b = await fetch(new Request('/api/req-body', { method: 'PUT', body: 'abc' }));
+      return [a.status, b.status];
+    });
+    expect(statuses).toEqual([200, 200]);
+    expect(server.requests).toEqual(expect.arrayContaining(['POST /api/upload', 'PUT /api/req-body']));
+  });
+
+  test('the patched fetch keeps the native name and length', async ({ context, server }) => {
+    const page = await openWithRules({ context, server }, []);
+    expect(await page.evaluate(() => [fetch.name, fetch.length])).toEqual(['fetch', 1]);
+  });
+
+  const CASES = [
+    { status: 200, ct: 'application/json', body: '{"a":1}' },
+    { status: 201, ct: 'text/plain', body: 'created' },
+    { status: 204, ct: 'text/plain', body: '' },
+    { status: 400, ct: 'application/json', body: '{"e":"bad"}' },
+    { status: 404, ct: 'text/html', body: '<p>nope</p>' },
+    { status: 500, ct: 'application/json', body: '{"e":1}' },
+    { status: 503, ct: 'text/plain', body: '' },
+  ];
+
+  test('conformance: a mocked response looks like the real one for common cases', async ({ context, server }) => {
+    const page = await openWithRules(
+      { context, server },
+      CASES.map((c, i) =>
+        rule({
+          url: `/mocked/${i}`,
+          response: {
+            status: c.status,
+            body: c.body,
+            headers: [{ name: 'Content-Type', value: c.ct }, { name: 'X-A', value: '1' }],
+          },
+        }),
+      ),
+    );
+    const observe = (url) =>
+      page.evaluate(async (u) => {
+        const res = await fetch(u);
+        const copy = res.clone();
+        const text = await res.text();
+        const bytes = (await copy.arrayBuffer()).byteLength;
+        return {
+          status: res.status,
+          ok: res.ok,
+          statusText: res.statusText,
+          redirected: res.redirected,
+          contentType: res.headers.get('content-type'),
+          xa: res.headers.get('x-a'),
+          text,
+          bytes,
+        };
+      }, url);
+
+    for (const [i, c] of CASES.entries()) {
+      const q = `status=${c.status}&h=${encodeURIComponent('content-type:' + c.ct)}&h=${encodeURIComponent('x-a:1')}&body=${encodeURIComponent(c.body)}`;
+      const real = await observe(`/reflect?${q}`);
+      const mocked = await observe(`/mocked/${i}`);
+      expect(mocked, `status ${c.status}`).toEqual(real);
+    }
+  });
+});

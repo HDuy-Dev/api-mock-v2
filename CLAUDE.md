@@ -26,6 +26,15 @@ engine.js   ◀─RULES─ bridge.js  ◀─storage─ background.js
 - **shared/** — ES modules for the service worker, popup and panel only. `engine.js` and `bridge.js` cannot import anything.
 - Message contract: engine ↔ bridge use `window.postMessage` with `type` prefix `__API_MOCK__/`; bridge → worker and UI → worker use `chrome.runtime.sendMessage` (see the table in the design spec, section 3).
 
+## UI (panel and popup)
+
+- Plain ES-module pages, no build. The DevTools panel is `panel/panel.html` (registered by `devtools.js`); the popup is `popup/popup.html`.
+- **Reads** come straight from `chrome.storage` (`shared/store.js#readAll`, re-run on `subscribe`); **writes** are service-worker messages (`SAVE_RULE`, `DELETE_RULE`, `REORDER`, `SET_GLOBAL`, `CLEAR_LOG`). The UI never writes `state`.
+- `shared/dom.js#h()` builds DOM. **Never** use `innerHTML` with data: rule names, URLs and log entries are untrusted.
+- Panel modules: `panel.js` (bar, list, wiring), `editor.js` (form, validation, 700 ms auto-save, drafts), `menu.js` (⋮ menu, delete dialog), `log.js` (log view), `ui.js` (UI-only state: selection, search, drafts). Drafts (new rules that are not valid yet) live only in memory; after a save the panel calls `api.refresh()` before dropping the draft.
+- Test hooks: `panel/panel.html?tabId=<id>` and `popup/popup.html?tabId=<id>` target a tab; in real DevTools the panel uses `chrome.devtools.inspectedWindow.tabId`. `openExtensionPage()` in tests opens `devtools.html` by default (a neutral extension page).
+- Styling: tokens and shared components in `shared/ui.css` (visual style B, see the UI design doc).
+
 ## Conventions
 
 - Flat layout; banner comments `// ── Section ──` inside files.

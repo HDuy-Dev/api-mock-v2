@@ -2,6 +2,7 @@ import { h, clear } from '../shared/dom.js';
 import { send } from '../shared/store.js';
 import { METHODS, validateRule, parseHeaders, stringifyHeaders, isJson, formatJson } from '../shared/rule.js';
 import { ui, uiChanged } from './ui.js';
+import { ruleMenu } from './menu.js';
 
 const AUTOSAVE_MS = 700;
 const SAVED_VISIBLE_MS = 2000;
@@ -85,7 +86,7 @@ export function mountEditor(container, rule, api) {
   const el = h(
     'div',
     { class: 'editor' },
-    h('div', { class: 'ed-top' }, nameInput, saved, h('span', { class: 'sp' })),
+    h('div', { class: 'ed-top' }, nameInput, saved, h('span', { class: 'sp' }), ruleMenu(id, api)),
     h('div', { class: 'line' }, methodSelect, h('div', { class: 'fld grow' }, urlInput, msgs.url)),
     h('div', { class: 'line' },
       h('div', { class: 'fld' }, 'Status', statusInput, msgs.status),

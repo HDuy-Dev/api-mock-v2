@@ -9,7 +9,7 @@ let seq = 0;
 let focusSelected = false; // restore keyboard focus after a re-render caused by arrow keys
 let mountedId = null; // rule currently open in the editor
 const latest = (id) => ui.drafts.get(id) || (data && data.state.rules.find((r) => r.id === id)) || null;
-const editorApi = { latest, refresh: () => update() };
+const editorApi = { latest, refresh: () => update(), rules: () => (data ? data.state.rules : []) };
 
 function resolveTabId() {
   const fromUrl = new URLSearchParams(location.search).get('tabId'); // test hook
@@ -123,7 +123,8 @@ function render() {
   if (!selected) {
     unmountEditor();
     mountedId = null;
-    if (!isEmpty) clear(els.editorSlot).append(h('div', { class: 'placeholder' }, 'Select a rule to edit.'));
+    clear(els.editorSlot);
+    if (!isEmpty) els.editorSlot.append(h('div', { class: 'placeholder' }, 'Select a rule to edit.'));
   } else if (ui.selectedId !== mountedId) {
     mountedId = ui.selectedId;
     mountEditor(els.editorSlot, selected, editorApi);

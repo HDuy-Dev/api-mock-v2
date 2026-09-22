@@ -1,5 +1,6 @@
 // Service worker (ES module). Owns state; never sits on the request path.
 import { defaultState, sanitizeRule, validateRule } from './shared/rule.js';
+import { computeBadge, drawIcon } from './shared/status.js';
 
 const STATE_KEY = 'state';
 
@@ -148,8 +149,10 @@ function addLog(t, entry) {
   if (t.log.length > LOG_MAX) t.log.splice(0, t.log.length - LOG_MAX);
 }
 
-// Called after a tab's counters or log changed. Task 10 refreshes the badge here.
-async function afterTabChange(_tabId) {}
+// Called after a tab's counters or log changed.
+async function afterTabChange(tabId) {
+  await applyBadge(tabId, (await readState()).globalEnabled);
+}
 
 // ── Hits ───────────────────────────────────────────────────────────────────
 let hits = null; // Record<ruleId, number>, loaded lazily
@@ -226,4 +229,45 @@ chrome.tabs.onRemoved.addListener((tabId) => {
     tabs.delete(tabId);
     await chrome.storage.session.remove([`log:${tabId}`, `tab:${tabId}`]);
   });
+});
+
+// ── Icon and badge ─────────────────────────────────────────────────────────
+async function updateIcon(enabled) {
+  await chrome.action.setIcon({
+    imageData: {
+      16: drawIcon(16, enabled),
+      32: drawIcon(32, enabled),
+      48: drawIcon(48, enabled),
+      128: drawIcon(128, enabled),
+    },
+  });
+}
+
+async function applyBadge(tabId, globalEnabled) {
+  const t = await loadTab(tabId);
+  const b = computeBadge({ globalEnabled, ...t.counters });
+  await chrome.action.setBadgeText({ tabId, text: b.text });
+  await chrome.action.setBadgeBackgroundColor({ tabId, color: b.bg });
+  await chrome.action.setBadgeTextColor({ tabId, color: b.color });
+  await chrome.action.setTitle({ tabId, title: b.title });
+}
+
+// Icon, the global badge/title (what tabs without an engine show) and every open tab.
+async function refreshAll() {
+  const { globalEnabled } = await readState();
+  await updateIcon(globalEnabled);
+  await chrome.action.setBadgeText({ text: globalEnabled ? '' : 'OFF' });
+  await chrome.action.setBadgeBackgroundColor({ color: '#4b5563' });
+  await chrome.action.setTitle({ title: globalEnabled ? 'API Mock — Active' : 'API Mock — Off' });
+  const all = await chrome.tabs.query({});
+  await Promise.all(all.filter((tab) => tab.id !== undefined).map((tab) => applyBadge(tab.id, globalEnabled)));
+}
+
+chrome.runtime.onInstalled.addListener(() => enqueue(refreshAll));
+chrome.runtime.onStartup.addListener(() => enqueue(refreshAll));
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local' || !changes.state) return;
+  const was = changes.state.oldValue ? changes.state.oldValue.globalEnabled !== false : true;
+  const now = changes.state.newValue ? changes.state.newValue.globalEnabled !== false : true;
+  if (was !== now) enqueue(refreshAll);
 });

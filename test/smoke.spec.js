@@ -17,7 +17,7 @@ test('engine content script runs in the MAIN world of a plain http page (spec as
   expect(await page.evaluate(() => fetch('/mocked').then((r) => r.text()))).toBe('{"mocked":true}');
 });
 
-test('bridge content script (ISOLATED world) can message extension pages', async ({ context, server, extensionId }) => {
+test('bridge content script (ISOLATED world) reports PAGE_START to extension pages', async ({ context, server, extensionId }) => {
   const ext = await openExtensionPage(context, extensionId);
   await ext.evaluate(() => {
     window.__msgs = [];
@@ -27,5 +27,5 @@ test('bridge content script (ISOLATED world) can message extension pages', async
   });
   const page = await context.newPage();
   await page.goto(server.origin + '/');
-  await expect.poll(() => ext.evaluate(() => window.__msgs.map((m) => m.type))).toContain('BRIDGE_STUB');
+  await expect.poll(() => ext.evaluate(() => window.__msgs.map((m) => m.type))).toContain('PAGE_START');
 });

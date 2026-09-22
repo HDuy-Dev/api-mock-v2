@@ -25,6 +25,9 @@ function startServer() {
     if (url.pathname === '/startup-race.html') {
       return send(res, 200, { 'content-type': 'text/html' }, STARTUP_RACE_HTML);
     }
+    if (url.pathname === '/frame-parent.html') {
+      return send(res, 200, { 'content-type': 'text/html' }, '<!doctype html><title>parent</title><iframe src="/"></iframe>');
+    }
     if (url.pathname === '/reflect') {
       // Returns exactly what the query asks for: ?status=418&h=x-a:1&h=content-type:text/plain&body=hi
       const status = Number(url.searchParams.get('status') || 200);

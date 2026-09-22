@@ -1,4 +1,4 @@
-import { h, clear } from '../shared/dom.js';
+import { h, clear, logoSvg, toggleSwitch } from '../shared/dom.js';
 import { readAll, subscribe, send } from '../shared/store.js';
 import { computePopupStatus } from '../shared/status.js';
 import { methodLabel } from '../shared/rule.js';
@@ -30,31 +30,6 @@ async function ping(id) {
 }
 
 // ── View pieces ────────────────────────────────────────────────────────────
-const SVG = 'http://www.w3.org/2000/svg';
-function logo() {
-  const svg = document.createElementNS(SVG, 'svg');
-  svg.setAttribute('viewBox', '0 0 24 24');
-  svg.setAttribute('fill', 'none');
-  svg.setAttribute('stroke', 'currentColor');
-  svg.setAttribute('stroke-width', '2');
-  svg.classList.add('logo');
-  const path = document.createElementNS(SVG, 'path');
-  path.setAttribute('d', 'M8 9l3 3-3 3M13 15h3M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z');
-  svg.append(path);
-  return svg;
-}
-
-function toggle(on, label, onClick) {
-  return h('button', {
-    class: 'tg' + (on ? ' on' : ''),
-    type: 'button',
-    role: 'switch',
-    'aria-checked': String(on),
-    'aria-label': label,
-    onclick: onClick,
-  });
-}
-
 function ruleRow(rule, hits) {
   return h(
     'div',
@@ -62,7 +37,7 @@ function ruleRow(rule, hits) {
     h('span', { class: `mth ${rule.method}` }, methodLabel(rule.method)),
     h('span', { class: 'txt' }, h('span', { class: 'nm' }, rule.name), h('span', { class: 'ur', title: rule.url }, rule.url)),
     h('span', { class: 'hit', title: 'Times matched' }, String(hits[rule.id] || 0)),
-    toggle(rule.enabled, `Enable ${rule.name}`, () => send({ type: 'SAVE_RULE', rule: { ...rule, enabled: !rule.enabled } })),
+    toggleSwitch(rule.enabled, `Enable ${rule.name}`, () => send({ type: 'SAVE_RULE', rule: { ...rule, enabled: !rule.enabled } })),
   );
 }
 
@@ -97,11 +72,11 @@ function render({ state, hits, tab }) {
 
   els.head.classList.toggle('off', !state.globalEnabled);
   clear(els.head).append(
-    logo(),
+    logoSvg(),
     h('span', { class: 't' }, 'API Mock'),
     h('span', { class: 'sp' }),
     h('span', { class: 'lbl' }, 'Mocking'),
-    toggle(state.globalEnabled, 'Mocking', () => send({ type: 'SET_GLOBAL', enabled: !state.globalEnabled })),
+    toggleSwitch(state.globalEnabled, 'Mocking', () => send({ type: 'SET_GLOBAL', enabled: !state.globalEnabled })),
   );
 
   els.status.className = `status ${status.kind}`;

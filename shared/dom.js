@@ -22,3 +22,31 @@ export function clear(el) {
   el.replaceChildren();
   return el;
 }
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+/** The extension's mark (a ">" in a rounded square), coloured by currentColor. */
+export function logoSvg() {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '2');
+  svg.classList.add('logo');
+  const path = document.createElementNS(SVG_NS, 'path');
+  path.setAttribute('d', 'M8 9l3 3-3 3M13 15h3M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z');
+  svg.append(path);
+  return svg;
+}
+
+/** A switch: <button class="tg on" role="switch" aria-checked="true">. */
+export function toggleSwitch(on, label, onClick) {
+  return h('button', {
+    class: 'tg' + (on ? ' on' : ''),
+    type: 'button',
+    role: 'switch',
+    'aria-checked': String(on),
+    'aria-label': label,
+    onclick: onClick,
+  });
+}

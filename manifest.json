@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "API Mock v2",
+  "version": "0.1.0",
+  "description": "Intercept fetch/XHR and answer with your own response.",
+  "minimum_chrome_version": "111",
+  "permissions": ["storage"],
+  "action": { "default_popup": "popup/popup.html", "default_title": "API Mock" },
+  "background": { "service_worker": "background.js", "type": "module" },
+  "content_scripts": [
+    { "matches": ["<all_urls>"], "js": ["engine.js"], "run_at": "document_start", "world": "MAIN", "all_frames": true },
+    { "matches": ["<all_urls>"], "js": ["bridge.js"], "run_at": "document_start", "all_frames": true }
+  ]
+}

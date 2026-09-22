@@ -1,0 +1,13 @@
+{
+  "name": "api-mock-v2",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Chrome MV3 extension that answers fetch/XHR requests with user-defined responses",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "HEADED=1 playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}

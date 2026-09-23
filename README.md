@@ -2,7 +2,7 @@
 
 A Chrome (Manifest V3, Chrome 111+) extension that answers `fetch` and `XMLHttpRequest` calls with responses you define: status, headers, body and delay. It works inside the page, so it is silent (no console output, no DOM changes) and needs no `debugger` permission.
 
-> Status: the core is done (engine, bridge, service worker). The panel and popup UI are planned in `docs/superpowers/plans/2026-09-21-api-mock-v2-ui.md`.
+> Status: the core (engine, bridge, service worker) and the UI (DevTools panel, popup) are implemented.
 
 ## Install (developer mode)
 
@@ -10,7 +10,14 @@ A Chrome (Manifest V3, Chrome 111+) extension that answers `fetch` and `XMLHttpR
 2. **Load unpacked** → select this folder.
 3. Reload the extension card after editing any file.
 
-## Try it without a UI
+## Using it
+
+1. Open DevTools (F12) on the page you are working on and select the **API Mock** tab.
+2. Click **+ Add rule**. Fill in the URL pattern (see below), method, status, delay, headers and body. Rules save automatically; a red *Not applied* / *Unsaved edits* label means the last edit is invalid and is not in use yet.
+3. Reload nothing: matching `fetch`/`XHR` calls on the page are answered right away. Mocked requests do **not** appear in the Network tab — watch the **Log** at the bottom of the panel instead.
+4. The toolbar icon opens a small control: the global on/off switch, a per-rule switch, and a status line for the current tab. The badge shows how many requests were mocked on the tab (`!` when something went wrong, `OFF` when mocking is off).
+
+## Seeding a rule from the service worker console (debugging)
 
 Open the extension's service worker console (`chrome://extensions` → API Mock v2 → *service worker*) and run:
 

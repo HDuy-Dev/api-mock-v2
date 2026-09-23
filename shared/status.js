@@ -51,3 +51,25 @@ export function drawIcon(size, active) {
 
   return ctx.getImageData(0, 0, size, size);
 }
+
+// ── Popup status strip ─────────────────────────────────────────────────────
+// First matching condition wins: off → not reachable → issues → no rules → active.
+export function computePopupStatus({ globalEnabled, reachable, issues = 0, mocked = 0, ruleCount = 0 }) {
+  if (!globalEnabled) return { kind: 'off', title: 'Off', detail: 'requests go straight to the network' };
+  if (!reachable) {
+    return {
+      kind: 'warn',
+      title: 'Not active on this tab yet',
+      detail: 'This tab was opened before the extension started — reload it to begin mocking. Not available on chrome:// pages or the Chrome Web Store.',
+    };
+  }
+  if (issues > 0) {
+    return {
+      kind: 'warn',
+      title: `${issues} issue${issues === 1 ? '' : 's'} on this tab`,
+      detail: 'Something went wrong on this tab. Details: DevTools → API Mock → Log. Reloading the page often helps.',
+    };
+  }
+  if (ruleCount === 0) return { kind: 'ok', title: 'Active', detail: 'no rules yet' };
+  return { kind: 'ok', title: 'Active', detail: mocked > 0 ? `${mocked} mocked on this tab` : 'nothing mocked on this tab yet' };
+}

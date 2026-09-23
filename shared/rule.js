@@ -43,6 +43,40 @@ export function isJson(text) {
   }
 }
 
+// Recursively parses string values that look like JSON objects or arrays ("un-stringifies" nested JSON).
+export function deepExpand(value) {
+  if (typeof value === 'string') {
+    const t = value.trim();
+    if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
+      try {
+        return deepExpand(JSON.parse(t));
+      } catch {
+        return value;
+      }
+    }
+    return value;
+  }
+  if (Array.isArray(value)) return value.map(deepExpand);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, deepExpand(v)]));
+  }
+  return value;
+}
+
+// Pretty-prints JSON (2 spaces) after expanding nested JSON strings; leaves invalid JSON unchanged.
+export function formatJson(text) {
+  try {
+    return { ok: true, text: JSON.stringify(deepExpand(JSON.parse(text)), null, 2) };
+  } catch {
+    return { ok: false, text };
+  }
+}
+
+const SHORT_METHOD = { DELETE: 'DEL', OPTIONS: 'OPT' };
+export function methodLabel(method) {
+  return SHORT_METHOD[method] || method;
+}
+
 // ── Headers ("Key: Value" lines ⇄ [{ name, value }]) ───────────────────────
 export function parseHeaders(text) {
   const headers = [];

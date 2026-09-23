@@ -1,0 +1,36 @@
+html, body { width: 380px; }
+#app { overflow: hidden; }
+
+.head { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 12px; background: var(--surface); border-bottom: 1px solid var(--bd); }
+.head .logo { width: 20px; height: 20px; color: var(--ac); flex: none; }
+.head.off .logo { color: #6b7280; }
+.head .t { font-weight: 600; }
+.head .lbl { font-size: 11px; color: var(--mu); }
+.head .tg { width: 32px; height: 18px; border-radius: 10px; }
+.head .tg::after { width: 14px; height: 14px; }
+.head .tg.on::after { left: 16px; }
+
+.status { display: flex; align-items: flex-start; gap: 9px; padding: 9px 12px; font-size: 12px; border-bottom: 1px solid var(--bd-soft); }
+.status .dot { flex: none; width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; }
+.status small { display: block; margin-top: 2px; font-size: 11px; line-height: 1.45; color: var(--mu); }
+.status.ok { background: color-mix(in srgb, var(--ok) 9%, transparent); }
+.status.ok .dot { background: var(--ok); }
+.status.off { background: var(--bd-soft); }
+.status.off .dot { background: #6b7280; }
+.status.warn { background: color-mix(in srgb, var(--warn) 11%, transparent); }
+.status.warn .dot { background: var(--warn); }
+
+.search { padding: 8px 12px; border-bottom: 1px solid var(--bd-soft); }
+.search input { width: 100%; height: 26px; padding: 0 8px; background: var(--input); color: var(--tx); border: 1px solid var(--bd); border-radius: var(--r); }
+
+.list { max-height: 340px; overflow: auto; }
+.list.dim { opacity: 0.5; }
+.row { display: flex; align-items: center; gap: 8px; height: 46px; padding: 0 12px; border-bottom: 1px solid var(--bd-soft); }
+.row.off .txt, .row.off .mth { opacity: 0.4; }
+.txt { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.nm { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ur { font-size: 10.5px; color: var(--mu); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.none { padding: 26px 20px; text-align: center; color: var(--mu); font-size: 12px; }
+.none b, .foot b { color: var(--tx); }
+
+.foot { padding: 9px 12px; font-size: 11.5px; color: var(--mu); background: var(--surface); border-top: 1px solid var(--bd); }

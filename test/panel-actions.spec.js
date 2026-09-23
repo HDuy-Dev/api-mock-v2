@@ -79,18 +79,20 @@ test.describe('panel: ⋮ menu', () => {
     await expect(panel.locator('.row').nth(0)).toHaveClass(/\bsel\b/);
   });
 
-  test('Delete asks for confirmation; Cancel and Escape keep the rule', async ({ context, serviceWorker, extensionId }) => {
+  test('Delete asks for confirmation; Cancel and Escape keep the rule and return focus to the kebab button', async ({ context, serviceWorker, extensionId }) => {
     const panel = await openPanel(context, extensionId, serviceWorker);
     await panel.locator('.kebab').click();
     await menuItem(panel, 'Delete').click();
     await expect(panel.locator('.dialog p')).toHaveText('Delete rule "Users list"?');
     await panel.locator('.dialog .btn', { hasText: 'Cancel' }).click();
     await expect(panel.locator('.dialog')).toHaveCount(0);
+    await expect(panel.locator('.kebab')).toBeFocused();
 
     await panel.locator('.kebab').click();
     await menuItem(panel, 'Delete').click();
     await panel.keyboard.press('Escape');
     await expect(panel.locator('.dialog')).toHaveCount(0);
+    await expect(panel.locator('.kebab')).toBeFocused();
     expect((await stored(serviceWorker)).rules).toHaveLength(3);
   });
 

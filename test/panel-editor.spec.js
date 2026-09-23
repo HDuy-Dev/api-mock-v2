@@ -53,6 +53,13 @@ test.describe('panel: editor', () => {
     await expect(panel.locator('.editor .saved')).toHaveText('');
   });
 
+  test('URL, headers and body disable the browser spell-checker', async ({ context, serviceWorker, extensionId }) => {
+    const panel = await openEditor(context, extensionId, serviceWorker);
+    await expect(panel.locator('.editor .url')).toHaveJSProperty('spellcheck', false);
+    await expect(panel.locator('.editor .headers')).toHaveJSProperty('spellcheck', false);
+    await expect(panel.locator('.editor .body')).toHaveJSProperty('spellcheck', false);
+  });
+
   test('auto-saves a valid edit after the debounce and shows Saved', async ({ context, serviceWorker, extensionId }) => {
     const panel = await openEditor(context, extensionId, serviceWorker);
     await panel.locator('.editor .body').fill('{"ok":true}');

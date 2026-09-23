@@ -67,12 +67,17 @@ export function renderLog(slot, data) {
   const stick = !previous || previous.scrollTop + previous.clientHeight >= previous.scrollHeight - 4;
   const previousTop = previous ? previous.scrollTop : 0;
 
+  // A re-render (a mocked request arriving, roughly every 200ms while a page is being mocked, or a
+  // filter chip click re-rendering itself) always drops whatever was focused: capture its identity
+  // first — the filter key for a chip, or 'clear' for the Clear button — and restore it after.
+  const hadFocusKey = slot.contains(document.activeElement) ? document.activeElement.dataset.focusKey : undefined;
+
   const mocked = log.filter(isMock).length;
   const issues = log.length - mocked;
   const shown = filter === 'mocked' ? log.filter(isMock) : filter === 'issues' ? log.filter((e) => !isMock(e)) : log;
 
   const chip = (key, label) =>
-    h('button', { class: 'chip', type: 'button', 'aria-pressed': String(filter === key), onclick: () => { filter = key; renderLog(slot, lastData); } }, label);
+    h('button', { class: 'chip', type: 'button', dataset: { focusKey: `chip-${key}` }, 'aria-pressed': String(filter === key), onclick: () => { filter = key; renderLog(slot, lastData); } }, label);
 
   const list = h('div', { class: 'log-list' });
   if (tabId == null) list.append(h('div', { class: 'lr none' }, 'Open this panel from DevTools to see the log of the inspected tab.'));
@@ -92,10 +97,15 @@ export function renderLog(slot, data) {
         chip('mocked', `Mocked ${mocked}`),
         chip('issues', `Issues ${issues}`),
         h('span', { class: 'sp' }),
-        h('button', { class: 'btn clear', type: 'button', disabled: tabId == null || log.length === 0, onclick: () => send({ type: 'CLEAR_LOG', tabId }) }, 'Clear'),
+        h('button', { class: 'btn clear', type: 'button', dataset: { focusKey: 'clear' }, disabled: tabId == null || log.length === 0, onclick: () => send({ type: 'CLEAR_LOG', tabId }) }, 'Clear'),
       ),
       list,
     ),
   );
   list.scrollTop = stick ? list.scrollHeight : previousTop;
+
+  if (hadFocusKey !== undefined) {
+    const el = [...slot.querySelectorAll('[data-focus-key]')].find((n) => n.dataset.focusKey === hadFocusKey);
+    if (el) el.focus();
+  }
 }

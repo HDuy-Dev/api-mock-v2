@@ -42,6 +42,7 @@ function onRowKey(e) {
     }
   } else if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) {
     e.preventDefault();
+    focusSelected = true;
     select(e.currentTarget.dataset.id);
   }
 }
@@ -74,7 +75,7 @@ function ruleRow(rule, hits, isDraft) {
       tabindex: 0,
       'aria-selected': String(selected),
       dataset: { id: rule.id },
-      onclick: () => select(rule.id),
+      onclick: () => { focusSelected = true; select(rule.id); },
       onkeydown: onRowKey,
     },
     h('span', { class: `mth ${rule.method}` }, methodLabel(rule.method)),
@@ -110,13 +111,24 @@ function render() {
 
   const q = ui.query.trim().toLowerCase();
   const rows = q ? all.filter((r) => `${r.name} ${r.url}`.toLowerCase().includes(q)) : all;
+
+  // A re-render can happen for reasons that have nothing to do with the user (hit counts and log
+  // entries flush from the service worker roughly every 1s/200ms while a page is being mocked).
+  // Rebuilding the list always drops whatever was focused inside it, so capture its identity first.
+  const hadFocusId = els.list.contains(document.activeElement) ? document.activeElement.dataset.id : undefined;
+
   clear(els.list);
   if (rows.length) els.list.append(...rows.map((r) => ruleRow(r, hits, drafts.includes(r))));
   else els.list.append(h('div', { class: 'no-match' }, `No rules match "${ui.query.trim()}".`));
 
   if (focusSelected) {
+    // A user action (click, Enter/Space, arrow keys) just changed the selection: focus follows it.
     focusSelected = false;
     const row = els.list.querySelector('.row.sel');
+    if (row) row.focus();
+  } else if (hadFocusId !== undefined) {
+    // No selection change caused this render: keep focus on the same row it was on before.
+    const row = [...els.list.querySelectorAll('.row')].find((r) => r.dataset.id === hadFocusId);
     if (row) row.focus();
   }
 

@@ -4,9 +4,16 @@ import { defaultName } from '../shared/rule.js';
 import { ui, uiChanged } from './ui.js';
 
 // ── Delete confirmation ────────────────────────────────────────────────────
-export function confirmDelete(name) {
+/**
+ * Shows a modal confirming deletion of `name`; resolves to true/false.
+ * `restoreFocusTo`, when given, is the element to refocus once the dialog closes. Callers that
+ * open this from a menu item should pass it explicitly: the menu item itself is torn down (by
+ * `close()`) before `onClick` runs, so `document.activeElement` is already `<body>` by the time
+ * this function would otherwise capture it.
+ */
+export function confirmDelete(name, restoreFocusTo) {
   return new Promise((resolve) => {
-    const previous = document.activeElement;
+    const previous = restoreFocusTo || document.activeElement;
     const finish = (answer) => {
       document.removeEventListener('keydown', onKey, true);
       overlay.remove();
@@ -120,7 +127,9 @@ export function ruleMenu(id, api) {
   async function remove() {
     const rule = api.latest(id);
     const name = (rule && (rule.name || defaultName(rule.url))) || 'this rule';
-    if (!(await confirmDelete(name))) return;
+    // Pass the kebab button itself: it survives close() (only `menu` is removed), unlike
+    // document.activeElement, which close() has already reset to <body> by this point.
+    if (!(await confirmDelete(name, button))) return;
     await send({ type: 'DELETE_RULE', id });
     await api.refresh();
   }

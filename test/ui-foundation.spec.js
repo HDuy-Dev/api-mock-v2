@@ -53,6 +53,26 @@ test.describe('shared modules', () => {
     });
   });
 
+  test('h() sets boolean-false IDL properties (e.g. spellcheck) instead of dropping them', async () => {
+    const out = await ext.evaluate(async () => {
+      const { h } = await import('/shared/dom.js');
+      const input = h('input', { spellcheck: false });
+      const textarea = h('textarea', { spellcheck: false });
+      const defaultInput = h('input', {}); // sanity: without the prop, the browser default is true
+      const checkbox = h('input', { type: 'checkbox', checked: false, disabled: false });
+      return {
+        inputSpellcheck: input.spellcheck,
+        textareaSpellcheck: textarea.spellcheck,
+        defaultSpellcheck: defaultInput.spellcheck,
+        checked: checkbox.checked,
+        disabled: checkbox.disabled,
+      };
+    });
+    expect(out).toEqual({
+      inputSpellcheck: false, textareaSpellcheck: false, defaultSpellcheck: true, checked: false, disabled: false,
+    });
+  });
+
   test('methodLabel shortens DELETE and OPTIONS only', async () => {
     const out = await ext.evaluate(async () => {
       const { methodLabel } = await import('/shared/rule.js');

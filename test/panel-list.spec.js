@@ -52,6 +52,41 @@ test.describe('panel: rules list', () => {
     await expect(panel.locator('.row').nth(0)).toHaveClass(/\bsel\b/);
   });
 
+  test('after clicking a row, arrow keys keep navigating (the click leaves focus on the row)', async ({ context, serviceWorker, extensionId }) => {
+    await setState(serviceWorker, { rules: RULES() });
+    const panel = await openPanel(context, extensionId);
+    await panel.locator('.row').nth(1).click();
+    await expect(panel.locator('.row').nth(1)).toHaveClass(/\bsel\b/);
+    await expect(panel.locator('.row').nth(1)).toBeFocused();
+    await panel.keyboard.press('ArrowDown');
+    await expect(panel.locator('.row').nth(2)).toHaveClass(/\bsel\b/);
+  });
+
+  test('after Enter selects a row, arrow keys keep navigating', async ({ context, serviceWorker, extensionId }) => {
+    await setState(serviceWorker, { rules: RULES() });
+    const panel = await openPanel(context, extensionId);
+    await panel.locator('.row').nth(1).focus();
+    await panel.keyboard.press('Enter');
+    await expect(panel.locator('.row').nth(1)).toHaveClass(/\bsel\b/);
+    await expect(panel.locator('.row').nth(1)).toBeFocused();
+    await panel.keyboard.press('ArrowDown');
+    await expect(panel.locator('.row').nth(2)).toHaveClass(/\bsel\b/);
+  });
+
+  test('a re-render triggered elsewhere (e.g. hit counts flushing) does not steal focus from the focused row', async ({ context, serviceWorker, extensionId }) => {
+    await setState(serviceWorker, { rules: RULES() });
+    const panel = await openPanel(context, extensionId);
+    await panel.locator('.row').nth(1).focus();
+    await expect(panel.locator('.row').nth(1)).toBeFocused();
+    // The service worker flushes hit counts roughly every second while a page is being mocked;
+    // this write is not caused by any panel interaction, so `focusSelected` never gets set.
+    await serviceWorker.evaluate(() => chrome.storage.local.set({ hits: { b: 1 } }));
+    await expect(panel.locator('.row').nth(1).locator('.hit')).toHaveText('1'); // proves the re-render happened
+    await expect(panel.locator('.row').nth(1)).toBeFocused();
+    await panel.keyboard.press('ArrowDown'); // still works: the row genuinely has focus
+    await expect(panel.locator('.row').nth(2)).toHaveClass(/\bsel\b/);
+  });
+
   test('a rule switch toggles that rule without changing the selection', async ({ context, serviceWorker, extensionId }) => {
     await setState(serviceWorker, { rules: RULES() });
     const panel = await openPanel(context, extensionId);

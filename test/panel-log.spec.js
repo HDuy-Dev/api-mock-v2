@@ -76,6 +76,18 @@ test.describe('panel: log', () => {
     await expect(panel.locator('.log-list .lr')).toHaveCount(4);
   });
 
+  test('a new mocked request arriving does not steal focus from a focused filter chip', async ({ context, server, serviceWorker, extensionId }) => {
+    const { page, panel } = await openLog(context, server, serviceWorker, extensionId, [
+      rule({ id: 'r1', name: 'Users list', url: '/mocked' }),
+    ]);
+    const issuesChip = panel.locator('.chip', { hasText: 'Issues' });
+    await issuesChip.focus();
+    await expect(issuesChip).toBeFocused();
+    await page.evaluate(() => fetch('/mocked')); // triggers a log re-render ~independently of the panel
+    await expect(panel.locator('.log-list .lr')).toHaveCount(1);
+    await expect(issuesChip).toBeFocused();
+  });
+
   test('an empty filter says so', async ({ context, server, serviceWorker, extensionId }) => {
     const { page, panel } = await openLog(context, server, serviceWorker, extensionId, [rule({ url: '/mocked' })]);
     await page.evaluate(() => fetch('/mocked'));

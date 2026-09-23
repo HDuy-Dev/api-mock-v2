@@ -131,6 +131,17 @@ test.describe('panel: rules list', () => {
     await expect(panel.locator('.row').nth(0)).toHaveClass(/\bsel\b/); // still unchanged
   });
 
+  test('clicking a rule switch keeps focus on that same switch across the resulting re-render', async ({ context, serviceWorker, extensionId }) => {
+    await setState(serviceWorker, { rules: RULES() });
+    const panel = await openPanel(context, extensionId);
+    const row = panel.locator('.row').nth(1); // 'Login', enabled: true
+    const sw = row.locator('.tg');
+    await sw.click(); // focuses the switch (browser default) then round-trips SAVE_RULE through storage
+    await expect(sw).toHaveAttribute('aria-checked', 'false'); // proves the re-render happened
+    await expect(sw).toBeFocused(); // not the row, not <body>
+    await expect(row).not.toBeFocused();
+  });
+
   test('the global switch turns mocking off and on', async ({ context, serviceWorker, extensionId }) => {
     await setState(serviceWorker, { rules: RULES() });
     const panel = await openPanel(context, extensionId);

@@ -67,6 +67,15 @@ const els = {
 function ruleRow(rule, hits, isDraft) {
   const selected = rule.id === ui.selectedId;
   const pill = isDraft ? 'Not applied' : ui.unsaved.has(rule.id) ? 'Unsaved edits' : null;
+  // Same identity as the row's own dataset.id: lets render() restore focus to the switch
+  // specifically (not just the row) when the switch itself is what had focus.
+  const sw = isDraft
+    ? null
+    : toggleSwitch(rule.enabled, `Enable ${rule.name}`, (e) => {
+        e.stopPropagation(); // switching a rule must not select it
+        send({ type: 'SAVE_RULE', rule: { ...rule, enabled: !rule.enabled } });
+      });
+  if (sw) sw.dataset.id = rule.id;
   return h(
     'div',
     {
@@ -81,12 +90,7 @@ function ruleRow(rule, hits, isDraft) {
     h('span', { class: `mth ${rule.method}` }, methodLabel(rule.method)),
     h('span', { class: 'txt' }, h('span', { class: 'nm' }, rule.name || defaultName(rule.url)), h('span', { class: 'ur', title: rule.url }, rule.url || '(no URL yet)')),
     pill ? h('span', { class: 'draft' }, pill) : h('span', { class: 'hit', title: 'Times matched' }, String(hits[rule.id] || 0)),
-    isDraft
-      ? null
-      : toggleSwitch(rule.enabled, `Enable ${rule.name}`, (e) => {
-          e.stopPropagation(); // switching a rule must not select it
-          send({ type: 'SAVE_RULE', rule: { ...rule, enabled: !rule.enabled } });
-        }),
+    sw,
   );
 }
 
@@ -115,7 +119,9 @@ function render() {
   // A re-render can happen for reasons that have nothing to do with the user (hit counts and log
   // entries flush from the service worker roughly every 1s/200ms while a page is being mocked).
   // Rebuilding the list always drops whatever was focused inside it, so capture its identity first.
-  const hadFocusId = els.list.contains(document.activeElement) ? document.activeElement.dataset.id : undefined;
+  const inList = els.list.contains(document.activeElement);
+  const hadFocusId = inList ? document.activeElement.dataset.id : undefined;
+  const hadFocusSwitch = inList && document.activeElement.classList.contains('tg');
 
   clear(els.list);
   if (rows.length) els.list.append(...rows.map((r) => ruleRow(r, hits, drafts.includes(r))));
@@ -127,9 +133,10 @@ function render() {
     const row = els.list.querySelector('.row.sel');
     if (row) row.focus();
   } else if (hadFocusId !== undefined) {
-    // No selection change caused this render: keep focus on the same row it was on before.
-    const row = [...els.list.querySelectorAll('.row')].find((r) => r.dataset.id === hadFocusId);
-    if (row) row.focus();
+    // No selection change caused this render: keep focus on the same row it was on before —
+    // or, if a switch (not the row) had focus, on that same rule's switch.
+    const el = [...els.list.querySelectorAll(hadFocusSwitch ? '.tg' : '.row')].find((n) => n.dataset.id === hadFocusId);
+    if (el) el.focus();
   }
 
   const selected = all.find((r) => r.id === ui.selectedId) || null;
